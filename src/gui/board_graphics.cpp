@@ -17,26 +17,27 @@ bool BoardGraphics::loadSkins(const string boardSkin, const string PieceSkin)
     currentBoardSkin = boardSkin;
     currentPieceSkin = PieceSkin;
 
-    bool boardSuccess = boardTexture.loadFromFile("assets/boards/" + currentBoardSkin + ".png");
-    bool pieceSuccess;
-    for (int i = 0; i < 12; i++)
+    const bool boardSuccess = boardTexture.loadFromFile("assets/boards/" + currentBoardSkin + ".png");
+    bool allPiecesLoaded = true;
+    for (int i = 0; i < 12; ++i)
     {
-        string_view pieceName = GetPieceNameByIndex(i);
-        string fullPath = format("assets/pieces/{}/{}.png", currentPieceSkin, pieceName);
+        const string_view pieceName = GetPieceNameByIndex(i);
+        const string fullPath = format("assets/pieces/{}/{}.png", currentPieceSkin, pieceName);
 
-        pieceSuccess = pieceTexture[i].loadFromFile(fullPath);
+        const bool pieceLoaded = pieceTexture[i].loadFromFile(fullPath);
 
-        if (!pieceSuccess)
+        if (!pieceLoaded)
         {
             cerr << "Failed to load piece texture: " << fullPath << endl;
         }
+        allPiecesLoaded = pieceLoaded && allPiecesLoaded;
     }
 
     if (!boardSuccess)
     {
         cerr << "Failed to load board texture" << endl;
     }
-    return boardSuccess && pieceSuccess;
+    return boardSuccess && allPiecesLoaded;
 }
 
 void BoardGraphics::drawBoard(RenderWindow &window, Texture &boardTexture)
@@ -132,11 +133,12 @@ void BoardGraphics::run_loop(Position position)
 
             if (const auto* release = event->getIf<Event::MouseButtonReleased>()){
                 if (!(release && release->button == Mouse::Button::Left && draggedSquare)) continue;
-                const auto target = squareAt(release->position);
-                if(target || !(draggedSquare == target)){
+                if (const auto target = squareAt(release->position);
+                    target && *target != *draggedSquare)
+                {
                     position.make_move(*draggedSquare, *target);
-                    draggedSquare.reset();
                 }
+                draggedSquare.reset();
             }
         }
         window.clear();
