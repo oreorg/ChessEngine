@@ -1,0 +1,26 @@
+#pragma once
+
+#include <iostream>
+#include <vector>
+#include <chess/core/position.h>
+#include <chess/engine/magic.h>
+
+void precompute_all_attacks();
+void generate_all_blockers(U64 mask, std::vector<U64>& blockers);
+U64 generate_magic_number();
+
+void precompute_knight_attacks();
+
+void precompute_bishop_mask();
+void find_bishop_magics();
+
+void precompute_rook_mask();
+void find_rook_magics();
+
+U64 slow_attacks(int square, U64 occupied, PieceType type);
+
+const Magic<512>& get_bishop_magic();
+const Magic<4096>& get_rook_magic();
+
+U64 get_knight_attacks(int square);
+U64 shift_bitboard(U64 bitboard, int direction);
