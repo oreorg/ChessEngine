@@ -1,0 +1,18 @@
+Language: Cpp
+BasedOnStyle: LLVM
+
+# These two keys are responsible for the vertical alignment:
+AlignAfterOpenBracket: Align # Align parameters at the left edge of the line.
+AlignTrailingComments: true # Keeps any comments in sync.
+# AlignTrailingComments alignment is often crucial for readability when
+# functions have many parameters and explanations.
+
+# Basic styling settings that should match your screenshot's look:
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never # Use spaces for indentation
+ColumnLimit: 120 # Standard limit, adjust as needed
+
+# Control how spaces are added, matching modern C++ preferences:
+SpaceAfterCStyleCast: false
+AllowShortIfStatementsOnASingleLine: Always
