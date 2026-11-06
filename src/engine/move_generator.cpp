@@ -1,4 +1,5 @@
 #include <bit>
+#include <chess/core/helper.h>
 #include <chess/engine/attack_generator.h>
 #include <chess/engine/move_generator.h>
 #include <iterator>
@@ -36,7 +37,7 @@ vector<Move> generateLegalMoves(const Position &position) {
   PieceColor king_color = current_position.side_to_move;
 
   for (const auto move : move_list) {
-    current_position.make_move(move.startSquare, move.targetSquare);
+    current_position.make_move(move);
     if (!is_king_attacked(current_position, king_color)) legal_moves.push_back(move);
 
     current_position.undo_move();
@@ -53,10 +54,17 @@ void generatePawnMoves(const Position &position, vector<Move> &moveList) {
   const U64 opponent = position.occupancies[opponentColor];
   const U64 occupied = position.occupancies[BOTH];
 
-  auto addMoves = [&moveList](U64 targets, int offset) {
+  auto addMoves = [&moveList, direction](U64 targets, int offset, MoveType type = NORMAL) {
     while (targets != 0) {
+      int protomotionRank = direction == 8 ? 7 : 0;
       const int target = popLSB(targets);
-      moveList.push_back({target - offset, target});
+      if (target / 8 == protomotionRank) {
+        moveList.push_back({target - offset, target, PROMOTION, KNIGHT});
+        moveList.push_back({target - offset, target, PROMOTION, BISHOP});
+        moveList.push_back({target - offset, target, PROMOTION, ROOK});
+        moveList.push_back({target - offset, target, PROMOTION, QUEEN});
+      }
+      moveList.push_back({target - offset, target, type});
     }
   };
 
@@ -69,12 +77,23 @@ void generatePawnMoves(const Position &position, vector<Move> &moveList) {
 
   addMoves(shiftForward(clearFirstStep) & ~occupied, 2 * direction);
 
-  const U64 captureOne = isWhite ? ((pawns & ~FILE_A) << 7) & opponent : ((pawns & ~FILE_H) >> 7) & opponent;
+  const U64 enpassant_square = 1ULL << position.enpassant_square;
 
-  const U64 captureTwo = isWhite ? ((pawns & ~FILE_H) << 9) & opponent : ((pawns & ~FILE_A) >> 9) & opponent;
+  U64 captureOne = isWhite ? ((pawns & ~FILE_A) << 7) : ((pawns & ~FILE_H) >> 7);
+  U64 captureTwo = isWhite ? ((pawns & ~FILE_H) << 9) : ((pawns & ~FILE_A) >> 9);
 
-  addMoves(captureOne, isWhite ? 7 : -7);
-  addMoves(captureTwo, isWhite ? 9 : -9);
+  // generating enpassant moves
+  if (captureOne & enpassant_square) {
+    addMoves(captureOne & enpassant_square, isWhite ? 7 : -7, ENPASSANT);
+  }
+  if (captureTwo & enpassant_square) {
+    addMoves(captureTwo & enpassant_square, isWhite ? 9 : -9, ENPASSANT);
+  }
+  // filter captures after generating enpassant move
+  captureOne &= opponent;
+  captureTwo &= opponent;
+  addMoves(captureOne, isWhite ? 7 : -7, NORMAL);
+  addMoves(captureTwo, isWhite ? 9 : -9, NORMAL);
 }
 
 void generateKnightMoves(const Position &position, vector<Move> &moveList) {
@@ -108,6 +127,24 @@ void generateKingMoves(const Position &position, vector<Move> &moveList) {
     const int target = popLSB(attacks);
     moveList.push_back({square, target});
   }
+  // King Special Moves
+  if (is_king_attacked(position, position.side_to_move)) return;
+  const uint8_t king_side = position.side_to_move == WHITE ? WHITE_KING_SIDE : BLACK_KING_SIDE;
+  const uint8_t queen_side = position.side_to_move == WHITE ? WHITE_QUEEN_SIDE : BLACK_QUEEN_SIDE;
+  const int rank_offset = position.side_to_move == WHITE ? 0 : 56;
+  const int king_side_square = SQ_G1 + rank_offset;
+  const int queen_side_square = SQ_C1 + rank_offset;
+  const U64 king_side_path = 0x60ULL << rank_offset;
+  const U64 queen_side_path = 0x0EULL << rank_offset;
+  if (position.castling_right & king_side) {
+    if (!(position.occupancies[BOTH] & king_side_path))
+      moveList.push_back({square, king_side_square, CASTLE, KING_SIDE});
+  }
+
+  if (position.castling_right & queen_side) {
+    if (!(position.occupancies[BOTH] & queen_side_path))
+      moveList.push_back({square, queen_side_square, CASTLE, QUEEN_SIDE});
+  }
 }
 
 template <std::size_t TableSize>
@@ -119,7 +156,6 @@ void generateSlidingMovesImpl(const Position &position, vector<Move> &moveList, 
     const int square = popLSB(pieces);
     U64 mask = magic.mask[square];
     U64 number = magic.number[square];
-
     int bits = count_bits(mask);
     std::size_t index = ((mask & position.occupancies[BOTH]) * number) >> (64 - bits);
     attacks = magic.attacks[square][index];

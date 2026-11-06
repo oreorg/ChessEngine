@@ -30,4 +30,4 @@ U64 get_pawn_attacks(int square, PieceColor color);
 
 U64 shift_bitboard(U64 bitboard, int direction);
 
-bool is_king_attacked(Position &position, PieceColor kingColor);
+bool is_king_attacked(Position position, PieceColor kingColor);

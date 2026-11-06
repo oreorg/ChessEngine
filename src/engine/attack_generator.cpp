@@ -1,4 +1,5 @@
 #include <bit>
+#include <chess/core/helper.h>
 #include <chess/engine/attack_generator.h>
 #include <iterator>
 #include <random>
@@ -237,7 +238,7 @@ void precompute_rook_mask() {
   }
 }
 
-bool is_king_attacked(Position &position, PieceColor kingColor) {
+bool is_king_attacked(Position position, PieceColor kingColor) {
   U64 king_bitboard = position.piece_boards[KING + kingColor * 6];
   U64 occupancies = position.occupancies[BOTH];
   int square = popLSB(king_bitboard);
