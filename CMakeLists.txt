@@ -12,7 +12,8 @@ file(GLOB_RECURSE SOURCES
 )
 
 add_executable(ChessEngine ${SOURCES}
-    include/chess/engine/magic.h)
+    include/chess/engine/magic.h
+    include/chess/core/helper.h)
 
 target_include_directories(ChessEngine PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include

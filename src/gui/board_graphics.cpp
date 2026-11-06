@@ -1,4 +1,5 @@
 #include <SFML/Graphics.hpp>
+#include <algorithm>
 #include <chess/gui/board_graphics.h>
 
 using namespace std;
@@ -78,6 +79,7 @@ void BoardGraphics::drawSquare(RenderWindow &window, int targetSquare) {
 }
 
 void BoardGraphics::run_loop(Position position) {
+  vector<Move> legalMoves;
   RenderWindow window(VideoMode({SCREEN_SIZE, SCREEN_SIZE}), "Chess Engine");
   window.setFramerateLimit(60);
 
@@ -103,7 +105,10 @@ void BoardGraphics::run_loop(Position position) {
       if (const auto *press = event->getIf<Event::MouseButtonPressed>()) {
         if (!(press && press->button == Mouse::Button::Left)) continue;
         if (!(Mouse::isButtonPressed(Mouse::Button::Left))) continue;
+
+        legalMoves = position.getLegalMoves();
         const auto square = squareAt(press->position);
+
         if (!(square)) continue;
         if (!(position.board[*square] != NO_PIECE_TYPE)) continue;
         dragPosition = press->position;
@@ -112,21 +117,45 @@ void BoardGraphics::run_loop(Position position) {
 
       if (const auto *keyPress = event->getIf<Event::KeyPressed>()) {
         if (keyPress->code == sf::Keyboard::Key::R) {
-          position.undo_move();
+          cout << position.undo_move() << endl;
         }
       }
 
-      if (const auto *move = event->getIf<Event::MouseMoved>()) dragPosition = move->position;
+      if (const auto *moved = event->getIf<Event::MouseMoved>()) dragPosition = moved->position;
 
       if (const auto *release = event->getIf<Event::MouseButtonReleased>()) {
         if (!(release && release->button == Mouse::Button::Left && draggedSquare)) continue;
         if (const auto target = squareAt(release->position); target && *target != *draggedSquare) {
-          vector<Move> legalMoves = position.getLegalMoves();
-          const bool containsMove = std::ranges::any_of(legalMoves, [=](const Move &move) {
-            return move.startSquare == draggedSquare && move.targetSquare == target;
+          std::vector<Move> matchingMoves;
+
+          std::ranges::copy_if(legalMoves, std::back_inserter(matchingMoves), [&](const Move &move) {
+            return move.square() == *draggedSquare && move.target_square() == *target;
           });
-          if (containsMove) {
-            position.make_move(*draggedSquare, *target);
+          int chosenPiece = 0;
+          char selection;
+          if (!(matchingMoves.empty())) {
+            if (matchingMoves[0].type() == PROMOTION) {
+              cout << "choose n : KNIGHT | b : BISHOP | r : ROOK | q : QUEEN" << endl;
+              cin >> selection;
+              switch (selection) {
+              case 'n':
+                chosenPiece = 0;
+                break;
+              case 'b':
+                chosenPiece = 1;
+                break;
+              case 'r':
+                chosenPiece = 2;
+                break;
+              case 'q':
+                chosenPiece = 3;
+                break;
+              default:
+                chosenPiece = 3;
+                break;
+              }
+            }
+            position.make_move(matchingMoves[chosenPiece]);
           }
         }
         draggedSquare.reset();
@@ -135,10 +164,9 @@ void BoardGraphics::run_loop(Position position) {
     window.clear();
     drawBoard(window, boardTexture);
     if (draggedSquare) {
-      vector<Move> legalMoves = position.getLegalMoves();
       for (const auto move : legalMoves) {
-        if (!(draggedSquare == move.startSquare)) continue;
-        drawSquare(window, move.targetSquare);
+        if (!(draggedSquare == move.square())) continue;
+        drawSquare(window, move.target_square());
       }
     }
     for (int square = SQ_A1; square <= SQ_H8; square++) {
