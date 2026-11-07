@@ -1,5 +1,4 @@
 #pragma once
-#include <chess/core/position.h>
 #include <cstdint>
 #include <iostream>
 

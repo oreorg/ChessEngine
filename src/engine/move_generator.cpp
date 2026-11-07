@@ -30,21 +30,6 @@ vector<Move> generate_pseudo_legal_moves(const Position &position) {
   return move_list;
 }
 
-vector<Move> generate_legal_moves(const Position &position) {
-  Position current_position = position;
-  vector<Move> legal_moves = {};
-  vector<Move> move_list = generate_pseudo_legal_moves(current_position);
-  PieceColor king_color = current_position.side_to_move;
-
-  for (const auto move : move_list) {
-    current_position.make_move(move);
-    if (!is_king_attacked(current_position, king_color)) legal_moves.push_back(move);
-
-    current_position.undo_move();
-  }
-  return legal_moves;
-}
-
 void generate_pawn_moves(const Position &position, vector<Move> &move_list) {
   const bool is_white = position.side_to_move == WHITE;
   const int index = position.side_to_move * 6;

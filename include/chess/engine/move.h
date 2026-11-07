@@ -32,7 +32,8 @@ struct UndoInfo {
   PieceType captured_piece = NO_PIECE_TYPE;
   uint8_t castling_rights = 0;
   int en_passant_square = -1;
-
   MoveType move_type = NORMAL;
   int extra = -1;
+
+  int half_moves = -1;
 };

@@ -1,5 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include <algorithm>
+#include <chess/core/zobrist_hash.h>
 #include <chess/gui/board_graphics.h>
 
 using namespace std;
@@ -11,7 +12,7 @@ BoardGraphics::BoardGraphics() {
   }
 }
 
-bool BoardGraphics::load_skins(const string& board_skin, const string& piece_skin) {
+bool BoardGraphics::load_skins(const string &board_skin, const string &piece_skin) {
   current_board_skin = board_skin;
   current_piece_skin = piece_skin;
 
@@ -35,21 +36,22 @@ bool BoardGraphics::load_skins(const string& board_skin, const string& piece_ski
   return board_success && all_pieces_loaded;
 }
 
-void BoardGraphics::draw_board(RenderWindow& window, Texture& board_texture) {
+void BoardGraphics::draw_board(RenderWindow &window, Texture &board_texture) {
   Sprite square_sprite(board_texture);
   for (int square = SQ_A1; square <= SQ_H8; square++) {
     int col = get_file(square);
     int rank = get_rank(square);
     int texture_tile_size = board_texture.getSize().x / 8;
 
-    square_sprite.setTextureRect(IntRect({col * texture_tile_size, (rank)*texture_tile_size}, {texture_tile_size, texture_tile_size}));
+    square_sprite.setTextureRect(
+        IntRect({col * texture_tile_size, (rank)*texture_tile_size}, {texture_tile_size, texture_tile_size}));
 
     square_sprite.setPosition({static_cast<float>(tile_size * col), static_cast<float>(tile_size * rank)});
     window.draw(square_sprite);
   }
 }
 
-Sprite BoardGraphics::create_piece_sprite(Texture& piece_texture, int square) {
+Sprite BoardGraphics::create_piece_sprite(Texture &piece_texture, int square) {
   int rank = get_rank(square);
   int col = get_file(square);
 
@@ -79,7 +81,6 @@ void BoardGraphics::draw_square(RenderWindow &window, int target_square) {
 }
 
 void BoardGraphics::run_loop(Position position) {
-  vector<Move> legal_moves;
   RenderWindow window(VideoMode({screen_size, screen_size}), "Chess Engine");
   window.setFramerateLimit(60);
 
@@ -106,7 +107,6 @@ void BoardGraphics::run_loop(Position position) {
         if (!(press && press->button == Mouse::Button::Left)) continue;
         if (!(Mouse::isButtonPressed(Mouse::Button::Left))) continue;
 
-        legal_moves = position.get_legal_moves();
         const auto square = square_at(press->position);
 
         if (!(square)) continue;
@@ -117,7 +117,7 @@ void BoardGraphics::run_loop(Position position) {
 
       if (const auto *key_press = event->getIf<Event::KeyPressed>()) {
         if (key_press->code == sf::Keyboard::Key::R) {
-          cout << position.undo_move() << endl;
+          position.undo_move();
         }
       }
 
@@ -128,7 +128,7 @@ void BoardGraphics::run_loop(Position position) {
         if (const auto target = square_at(release->position); target && *target != *dragged_square) {
           std::vector<Move> matching_moves;
 
-          std::ranges::copy_if(legal_moves, std::back_inserter(matching_moves), [&](const Move &move) {
+          std::ranges::copy_if(position.legal_moves, std::back_inserter(matching_moves), [&](const Move &move) {
             return move.square() == *dragged_square && move.target_square() == *target;
           });
           int chosen_piece = 0;
@@ -156,6 +156,10 @@ void BoardGraphics::run_loop(Position position) {
               }
             }
             position.make_move(matching_moves[chosen_piece]);
+            cout << "hash: " << hex << position.hash_key
+                 << ", castling_rights: " << static_cast<unsigned int>(position.castling_rights)
+                 << ", side_to_move: " << position.side_to_move << dec
+                 << ", enpassant_square: " << position.en_passant_square << endl;
           }
         }
         dragged_square.reset();
@@ -164,7 +168,7 @@ void BoardGraphics::run_loop(Position position) {
     window.clear();
     draw_board(window, board_texture);
     if (dragged_square) {
-      for (const auto move : legal_moves) {
+      for (const auto move : position.legal_moves) {
         if (!(dragged_square == move.square())) continue;
         draw_square(window, move.target_square());
       }

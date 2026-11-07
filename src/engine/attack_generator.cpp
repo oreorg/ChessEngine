@@ -56,12 +56,15 @@ void precompute_knight_attacks() {
 void precompute_pawn_attacks() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
     Bitboard bitboard = 1ULL << square;
-    Bitboard attacks = 0ULL;
-    if (bitboard << 7 & ~FILE_H) attacks |= bitboard << 7;
-    if (bitboard << 9 & ~FILE_A) attacks |= bitboard << 9;
+    Bitboard white_attacks = 0ULL;
+    Bitboard black_attacks = 0ULL;
+    if (bitboard << 7 & ~FILE_H) white_attacks |= bitboard << 7;
+    if (bitboard << 9 & ~FILE_A) white_attacks |= bitboard << 9;
 
-    pawn_attacks[0][square] = vertical_flip(attacks);
-    pawn_attacks[1][square] = attacks;
+    if (bitboard >> 7 & ~FILE_A) black_attacks |= bitboard >> 7;
+    if (bitboard >> 9 & ~FILE_H) black_attacks |= bitboard >> 9;
+    pawn_attacks[0][square] = white_attacks;
+    pawn_attacks[1][square] = black_attacks;
   }
 }
 
