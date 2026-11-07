@@ -7,22 +7,22 @@
 
 class BoardGraphics{
     private:
-        sf::Texture boardTexture;
-        sf::Texture pieceTexture[12];
-        std::string currentPieceSkin = "game_room";
-        std::string currentBoardSkin = "dark_wood";
+        sf::Texture board_texture;
+        sf::Texture piece_textures[12];
+        std::string current_piece_skin = "game_room";
+        std::string current_board_skin = "dark_wood";
         
-        unsigned int SCREEN_SIZE = 800;
-        float TILE_SIZE = SCREEN_SIZE / 8;
-        float Offset = 50.0f;
-        float PIECE_SCALE = 0.9f;
+        unsigned int screen_size = 800;
+        float tile_size = screen_size / 8;
+        float offset = 50.0f;
+        float piece_scale = 0.9f;
 
     public:
         BoardGraphics();
 
-        bool loadSkins(const std::string boardSkin, const std::string PieceSkin);
-        void drawBoard(sf::RenderWindow& window,sf::Texture &boardTexture);
-        sf::Sprite createPieceSprite(sf::Texture &PieceTexture, int square);
+        bool load_skins(const std::string& board_skin, const std::string& piece_skin);
+        void draw_board(sf::RenderWindow& window, sf::Texture& board_texture);
+        sf::Sprite create_piece_sprite(sf::Texture& piece_texture, int square);
         void run_loop(Position position);
-        void drawSquare(sf::RenderWindow &window, int targetSquare);
+        void draw_square(sf::RenderWindow& window, int target_square);
 };

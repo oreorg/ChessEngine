@@ -15,8 +15,8 @@ void Position::clear() {
   }
 }
 
-void Position::place_piece(PieceType pt, PieceColor color, int square) {
-  int index = pt + (color * 6);
+void Position::place_piece(PieceType piece_type, PieceColor color, int square) {
+  int index = piece_type + (color * 6);
   set_bit(piece_boards[index], square);
   set_bit(occupancies[color], square);
   set_bit(occupancies[BOTH], square);
@@ -74,83 +74,83 @@ bool Position::make_move(Move move) {
   int target_square = move.target_square();
   if (start_square < SQ_A1 || start_square > SQ_H8 || target_square < SQ_A1 || target_square > SQ_H8) return false;
   if (start_square == target_square) return false;
-  std::vector<Move> legalMoves = generatePsuedoLegalMoves(*this);
+  std::vector<Move> legal_moves = generate_pseudo_legal_moves(*this);
   const int index = board[start_square];
   if (index == NO_PIECE_TYPE) return false;
-  PieceColor pieceColor = index >= 6 ? BLACK : WHITE;
-  if (side_to_move != pieceColor) return false;
-  const bool containsMove = std::ranges::any_of(legalMoves, [=](const Move &move) {
+  PieceColor piece_color = index >= 6 ? BLACK : WHITE;
+  if (side_to_move != piece_color) return false;
+  const bool contains_move = std::ranges::any_of(legal_moves, [=](const Move &move) {
     return move.square() == start_square && move.target_square() == target_square;
   });
-  if (!containsMove) return false;
+  if (!contains_move) return false;
 
-  bool isWhite = pieceColor == WHITE;
+  bool is_white = piece_color == WHITE;
 
-  PieceType pieceType = static_cast<PieceType>(index % 6);
-  UndoInfo info{start_square, target_square, static_cast<PieceType>(board[target_square]), castling_right,
-                enpassant_square};
+  PieceType piece_type = static_cast<PieceType>(index % 6);
+  UndoInfo info{start_square, target_square, static_cast<PieceType>(board[target_square]), castling_rights,
+                en_passant_square};
 
   // Updating Pawn Special Moves
-  if (pieceType == PAWN) {
-    int direction = isWhite ? 8 : -8;
+  if (piece_type == PAWN) {
+    int direction = is_white ? 8 : -8;
     if (std::abs(start_square - target_square) == 16) {
-      enpassant_square = target_square - direction;
+      en_passant_square = target_square - direction;
     } else {
-      enpassant_square = -1;
+      en_passant_square = -1;
     }
-    if (move.type() == ENPASSANT) {
-      info.capturedPiece = static_cast<PieceType>(board[target_square - direction]);
+    if (move.type() == EN_PASSANT) {
+      info.captured_piece = static_cast<PieceType>(board[target_square - direction]);
       remove_piece(target_square - direction);
     }
   } else {
-    enpassant_square = -1;
+    en_passant_square = -1;
   }
 
   // Checking for King Special Moves
-  if (pieceType == KING) {
-    if (pieceColor == WHITE) {
-      castling_right &= ~WHITE_KING_SIDE;
-      castling_right &= ~WHITE_QUEEN_SIDE;
+  if (piece_type == KING) {
+    if (piece_color == WHITE) {
+      castling_rights &= ~WHITE_KING_SIDE;
+      castling_rights &= ~WHITE_QUEEN_SIDE;
     } else {
-      castling_right &= ~BLACK_KING_SIDE;
-      castling_right &= ~BLACK_QUEEN_SIDE;
+      castling_rights &= ~BLACK_KING_SIDE;
+      castling_rights &= ~BLACK_QUEEN_SIDE;
     }
 
     if (move.type() == CASTLE) {
-      const int king_side_castle = isWhite ? SQ_G1 : SQ_G8;
-      const int queen_side_castle = isWhite ? SQ_C1 : SQ_C8;
-      const int rook_king_side = isWhite ? SQ_H1 : SQ_H8;
-      const int rook_queen_side = isWhite ? SQ_A1 : SQ_A8;
+      const int king_side_castle = is_white ? SQ_G1 : SQ_G8;
+      const int queen_side_castle = is_white ? SQ_C1 : SQ_C8;
+      const int rook_king_side = is_white ? SQ_H1 : SQ_H8;
+      const int rook_queen_side = is_white ? SQ_A1 : SQ_A8;
 
       if (target_square == king_side_castle) {
         info.extra = KING_SIDE;
-        place_piece(ROOK, pieceColor, target_square - 1);
+        place_piece(ROOK, piece_color, target_square - 1);
         remove_piece(rook_king_side);
       } else if (target_square == queen_side_castle) {
         info.extra = QUEEN_SIDE;
-        place_piece(ROOK, pieceColor, target_square + 1);
+        place_piece(ROOK, piece_color, target_square + 1);
         remove_piece(rook_queen_side);
       }
     }
   }
 
-  if (pieceType == ROOK) {
-    if (pieceColor == WHITE) {
-      if (move.extra() == KING_SIDE) castling_right &= ~WHITE_KING_SIDE;
-      if (move.extra() == QUEEN_SIDE) castling_right &= ~WHITE_QUEEN_SIDE;
+  if (piece_type == ROOK) {
+    if (piece_color == WHITE) {
+      if (move.extra() == KING_SIDE) castling_rights &= ~WHITE_KING_SIDE;
+      if (move.extra() == QUEEN_SIDE) castling_rights &= ~WHITE_QUEEN_SIDE;
     } else {
-      if (move.extra() == KING_SIDE) castling_right &= ~BLACK_KING_SIDE;
-      if (move.extra() == QUEEN_SIDE) castling_right &= ~BLACK_QUEEN_SIDE;
+      if (move.extra() == KING_SIDE) castling_rights &= ~BLACK_KING_SIDE;
+      if (move.extra() == QUEEN_SIDE) castling_rights &= ~BLACK_QUEEN_SIDE;
     }
   }
 
   if (move.type() == PROMOTION) {
-    pieceType = static_cast<PieceType>(move.extra());
+    piece_type = static_cast<PieceType>(move.extra());
   }
 
   remove_piece(target_square);
   remove_piece(start_square);
-  place_piece(pieceType, pieceColor, target_square);
+  place_piece(piece_type, piece_color, target_square);
   side_to_move = side_to_move == WHITE ? BLACK : WHITE;
   info.move_type = static_cast<MoveType>(move.type());
   history.push_back(info);
@@ -161,39 +161,39 @@ bool Position::undo_move() {
   if (history.empty()) return false;
   UndoInfo info = history.back();
   history.pop_back();
-  int startSquare = info.startSquare;
-  int targetSquare = info.targetSquare;
+  int start_square = info.start_square;
+  int target_square = info.target_square;
 
-  PieceColor pieceColor = board[info.targetSquare] >= 6 ? BLACK : WHITE;
-  PieceType pieceType = static_cast<PieceType>(board[info.targetSquare] % 6);
+  PieceColor piece_color = board[info.target_square] >= 6 ? BLACK : WHITE;
+  PieceType piece_type = static_cast<PieceType>(board[info.target_square] % 6);
 
-  if (info.move_type == PROMOTION) pieceType = PAWN;
+  if (info.move_type == PROMOTION) piece_type = PAWN;
   if (info.move_type == CASTLE) {
     if (info.extra == KING_SIDE) {
-      remove_piece(info.startSquare + 1);
-      place_piece(ROOK, pieceColor, info.startSquare + 3);
+      remove_piece(info.start_square + 1);
+      place_piece(ROOK, piece_color, info.start_square + 3);
     } else if (info.extra == QUEEN_SIDE) {
-      remove_piece(info.startSquare - 1);
-      place_piece(ROOK, pieceColor, info.startSquare - 4);
+      remove_piece(info.start_square - 1);
+      place_piece(ROOK, piece_color, info.start_square - 4);
     }
   }
-  if (info.move_type == ENPASSANT) {
-    PieceColor capturedColor = info.capturedPiece >= 6 ? BLACK : WHITE;
-    int direction = capturedColor ? -8 : 8;
-    place_piece(PAWN, capturedColor, info.targetSquare + direction);
+  if (info.move_type == EN_PASSANT) {
+    PieceColor captured_color = info.captured_piece >= 6 ? BLACK : WHITE;
+    int direction = captured_color ? -8 : 8;
+    place_piece(PAWN, captured_color, info.target_square + direction);
   }
-  remove_piece(targetSquare);
-  place_piece(pieceType, pieceColor, startSquare);
-  if (info.capturedPiece != NO_PIECE_TYPE && info.move_type != ENPASSANT) {
-    PieceColor capturedColor = info.capturedPiece >= 6 ? BLACK : WHITE;
-    PieceType capturedType = static_cast<PieceType>(info.capturedPiece % 6);
-    place_piece(capturedType, capturedColor, info.targetSquare);
+  remove_piece(target_square);
+  place_piece(piece_type, piece_color, start_square);
+  if (info.captured_piece != NO_PIECE_TYPE && info.move_type != EN_PASSANT) {
+    PieceColor captured_color = info.captured_piece >= 6 ? BLACK : WHITE;
+    PieceType captured_type = static_cast<PieceType>(info.captured_piece % 6);
+    place_piece(captured_type, captured_color, info.target_square);
   }
 
-  castling_right = info.castling_rights;
-  enpassant_square = info.enpassant_square;
+  castling_rights = info.castling_rights;
+  en_passant_square = info.en_passant_square;
   side_to_move = side_to_move == WHITE ? BLACK : WHITE;
   return true;
 }
 
-std::vector<Move> Position::getLegalMoves() { return generateLegalMoves(*this); }
+std::vector<Move> Position::get_legal_moves() { return generate_legal_moves(*this); }

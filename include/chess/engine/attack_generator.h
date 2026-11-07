@@ -6,8 +6,8 @@
 #include <vector>
 
 void precompute_all_attacks();
-void generate_all_blockers(U64 mask, std::vector<U64> &blockers);
-U64 generate_magic_number();
+void generate_all_blockers(Bitboard mask, std::vector<Bitboard> &blockers);
+Bitboard generate_magic_number();
 
 void precompute_knight_attacks();
 void precompute_king_attacks();
@@ -19,15 +19,15 @@ void find_bishop_magics();
 void precompute_rook_mask();
 void find_rook_magics();
 
-U64 slow_attacks(int square, U64 occupied, PieceType type);
+Bitboard slow_attacks(int square, Bitboard occupied, PieceType type);
 
-const Magic<512> &get_bishop_magic();
-const Magic<4096> &get_rook_magic();
+const MagicTable<512> &get_bishop_magic();
+const MagicTable<4096> &get_rook_magic();
 
-U64 get_knight_attacks(int square);
-U64 get_king_attacks(int square);
-U64 get_pawn_attacks(int square, PieceColor color);
+Bitboard get_knight_attacks(int square);
+Bitboard get_king_attacks(int square);
+Bitboard get_pawn_attacks(int square, PieceColor color);
 
-U64 shift_bitboard(U64 bitboard, int direction);
+Bitboard shift_bitboard(Bitboard bitboard, int direction);
 
-bool is_king_attacked(Position position, PieceColor kingColor);
+bool is_king_attacked(Position position, PieceColor king_color);

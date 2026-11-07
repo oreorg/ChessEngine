@@ -3,7 +3,7 @@
 #include <chess/core/types.h>
 #include <cstdint>
 
-enum MoveType { NORMAL, PROMOTION, CASTLE, ENPASSANT };
+enum MoveType { NORMAL, PROMOTION, CASTLE, EN_PASSANT };
 
 enum CastleSide { KING_SIDE, QUEEN_SIDE };
 
@@ -27,11 +27,11 @@ public:
 };
 
 struct UndoInfo {
-  int startSquare;
-  int targetSquare;
-  PieceType capturedPiece = NO_PIECE_TYPE;
+  int start_square;
+  int target_square;
+  PieceType captured_piece = NO_PIECE_TYPE;
   uint8_t castling_rights = 0;
-  int enpassant_square = -1;
+  int en_passant_square = -1;
 
   MoveType move_type = NORMAL;
   int extra = -1;

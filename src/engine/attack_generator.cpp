@@ -4,21 +4,21 @@
 #include <iterator>
 #include <random>
 
-constexpr U64 BORDER_MASK = 0xFF818181818181FFULL;
+constexpr Bitboard BORDER_MASK = 0xFF818181818181FFULL;
 
-constexpr U64 FILE_A = 0x0101010101010101ULL;
-constexpr U64 FILE_B = 0x0202020202020202ULL;
-constexpr U64 FILE_G = 0x4040404040404040ULL;
-constexpr U64 FILE_H = 0x8080808080808080ULL;
+constexpr Bitboard FILE_A = 0x0101010101010101ULL;
+constexpr Bitboard FILE_B = 0x0202020202020202ULL;
+constexpr Bitboard FILE_G = 0x4040404040404040ULL;
+constexpr Bitboard FILE_H = 0x8080808080808080ULL;
 
 std::mt19937_64 rng{666}; // Fixed seed makes magic search reproducible.
 
-U64 knight_attacks[64];
-U64 king_attacks[64];
-U64 pawn_attacks[2][64];
+Bitboard knight_attacks[64];
+Bitboard king_attacks[64];
+Bitboard pawn_attacks[2][64];
 
-Magic<512> bishop_magic;
-Magic<4096> rook_magic;
+MagicTable<512> bishop_magic;
+MagicTable<4096> rook_magic;
 
 void precompute_all_attacks() {
   precompute_knight_attacks();
@@ -34,8 +34,8 @@ void precompute_all_attacks() {
 
 void precompute_knight_attacks() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
-    U64 bitboard = 1ULL << square;
-    U64 attacks = 0ULL;
+    Bitboard bitboard = 1ULL << square;
+    Bitboard attacks = 0ULL;
 
     // KNIGHT WHEN ON LEFT SIDE
     if ((bitboard << 17) & ~FILE_A) attacks |= bitboard << 17;
@@ -55,8 +55,8 @@ void precompute_knight_attacks() {
 
 void precompute_pawn_attacks() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
-    U64 bitboard = 1ULL << square;
-    U64 attacks = 0ULL;
+    Bitboard bitboard = 1ULL << square;
+    Bitboard attacks = 0ULL;
     if (bitboard << 7 & ~FILE_H) attacks |= bitboard << 7;
     if (bitboard << 9 & ~FILE_A) attacks |= bitboard << 9;
 
@@ -67,8 +67,8 @@ void precompute_pawn_attacks() {
 
 void precompute_king_attacks() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
-    U64 bitboard = 1ULL << square;
-    U64 attacks = 0ULL;
+    Bitboard bitboard = 1ULL << square;
+    Bitboard attacks = 0ULL;
 
     if ((bitboard << 1) & ~FILE_A) attacks |= bitboard << 1;
     if ((bitboard << 7) & ~FILE_H) attacks |= bitboard << 7;
@@ -84,17 +84,17 @@ void precompute_king_attacks() {
   }
 }
 
-void generate_all_blockers(U64 mask, std::vector<U64> &blockers) {
-  U64 current = 0ULL;
+void generate_all_blockers(Bitboard mask, std::vector<Bitboard> &blockers) {
+  Bitboard current = 0ULL;
   do {
     blockers.push_back(current);
     current = (current - mask) & mask;
   } while (current);
 }
 
-U64 generate_magic_number() { return rng() & rng() & rng(); }
+Bitboard generate_magic_number() { return rng() & rng() & rng(); }
 
-U64 shift_bitboard(U64 bitboard, int direction) {
+Bitboard shift_bitboard(Bitboard bitboard, int direction) {
   switch (direction) {
   case 1:
     return (bitboard & ~FILE_H) << 1;
@@ -117,12 +117,12 @@ U64 shift_bitboard(U64 bitboard, int direction) {
   }
 }
 
-U64 slow_attacks(int square, U64 occupied, PieceType type) {
+Bitboard slow_attacks(int square, Bitboard occupied, PieceType type) {
   const std::array<int, 4> directions =
       type == BISHOP ? std::array<int, 4>{9, 7, -7, -9} : std::array<int, 4>{1, 8, -1, -8};
-  U64 attacks = 0ULL;
+  Bitboard attacks = 0ULL;
   for (const int direction : directions) {
-    U64 bitboard = 1ULL << square;
+    Bitboard bitboard = 1ULL << square;
     while ((bitboard = shift_bitboard(bitboard, direction)) != 0) {
       attacks |= bitboard;
       if (bitboard & occupied) break;
@@ -133,18 +133,18 @@ U64 slow_attacks(int square, U64 occupied, PieceType type) {
 
 void find_bishop_magics() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
-    const U64 mask = bishop_magic.mask[square];
+    const Bitboard mask = bishop_magic.mask[square];
     const int bits = count_bits(mask);
 
-    std::vector<U64> blockers;
+    std::vector<Bitboard> blockers;
     generate_all_blockers(mask, blockers);
 
-    std::vector<U64> attacks(blockers.size());
+    std::vector<Bitboard> attacks(blockers.size());
     for (std::size_t i = 0; i < blockers.size(); ++i) {
       attacks[i] = slow_attacks(square, blockers[i], BISHOP);
     }
     while (true) {
-      const U64 magic = generate_magic_number();
+      const Bitboard magic = generate_magic_number();
       std::fill(std::begin(bishop_magic.attacks[square]), std::end(bishop_magic.attacks[square]), 0ULL);
 
       bool fail = false;
@@ -170,18 +170,18 @@ void find_bishop_magics() {
 
 void find_rook_magics() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
-    const U64 mask = rook_magic.mask[square];
+    const Bitboard mask = rook_magic.mask[square];
     const int bits = count_bits(mask);
 
-    std::vector<U64> blockers;
+    std::vector<Bitboard> blockers;
     generate_all_blockers(mask, blockers);
 
-    std::vector<U64> attacks(blockers.size());
+    std::vector<Bitboard> attacks(blockers.size());
     for (std::size_t i = 0; i < blockers.size(); i++) {
       attacks[i] = slow_attacks(square, blockers[i], ROOK);
     }
     while (true) {
-      const U64 magic = generate_magic_number();
+      const Bitboard magic = generate_magic_number();
       std::fill(std::begin(rook_magic.attacks[square]), std::end(rook_magic.attacks[square]), 0ULL);
 
       bool fail = false;
@@ -205,18 +205,18 @@ void find_rook_magics() {
   }
 }
 
-U64 relevant_sliding_mask(int square, PieceType type) {
+Bitboard relevant_sliding_mask(int square, PieceType type) {
   const std::array<int, 4> directions =
       type == BISHOP ? std::array<int, 4>{9, 7, -7, -9} : std::array<int, 4>{1, 8, -1, -8};
 
-  U64 mask = 0ULL;
+  Bitboard mask = 0ULL;
   for (const int direction : directions) {
-    U64 bitboard = 1ULL << square;
+    Bitboard bitboard = 1ULL << square;
     while (true) {
       bitboard = shift_bitboard(bitboard, direction);
       if (bitboard == 0ULL) break;
 
-      const U64 next = shift_bitboard(bitboard, direction);
+      const Bitboard next = shift_bitboard(bitboard, direction);
       if (next == 0ULL) break;
 
       mask |= bitboard;
@@ -238,21 +238,21 @@ void precompute_rook_mask() {
   }
 }
 
-bool is_king_attacked(Position position, PieceColor kingColor) {
-  U64 king_bitboard = position.piece_boards[KING + kingColor * 6];
-  U64 occupancies = position.occupancies[BOTH];
-  int square = popLSB(king_bitboard);
+bool is_king_attacked(Position position, PieceColor king_color) {
+  Bitboard king_bitboard = position.piece_boards[KING + king_color * 6];
+  Bitboard occupancies = position.occupancies[BOTH];
+  int square = pop_lsb(king_bitboard);
   int rook_index = ((rook_magic.mask[square] & occupancies) * rook_magic.number[square]) >>
                    (64 - count_bits(rook_magic.mask[square]));
   int bishop_index = ((bishop_magic.mask[square] & occupancies) * bishop_magic.number[square]) >>
                      (64 - count_bits(bishop_magic.mask[square]));
 
-  PieceColor opponent = kingColor == WHITE ? BLACK : WHITE;
-  U64 rook = rook_magic.attacks[square][rook_index];
-  U64 bishop = bishop_magic.attacks[square][bishop_index];
-  U64 knight = knight_attacks[square];
-  U64 pawn = pawn_attacks[opponent][square];
-  U64 king = king_attacks[square];
+  PieceColor opponent = king_color == WHITE ? BLACK : WHITE;
+  Bitboard rook = rook_magic.attacks[square][rook_index];
+  Bitboard bishop = bishop_magic.attacks[square][bishop_index];
+  Bitboard knight = knight_attacks[square];
+  Bitboard pawn = pawn_attacks[opponent][square];
+  Bitboard king = king_attacks[square];
 
   if (bishop & (position.piece_boards[BISHOP + opponent * 6] | position.piece_boards[QUEEN + opponent * 6]))
     return true;
@@ -264,11 +264,11 @@ bool is_king_attacked(Position position, PieceColor kingColor) {
   return false;
 }
 
-U64 get_knight_attacks(int square) { return knight_attacks[square]; }
-U64 get_king_attacks(int square) { return king_attacks[square]; }
+Bitboard get_knight_attacks(int square) { return knight_attacks[square]; }
+Bitboard get_king_attacks(int square) { return king_attacks[square]; }
 
-U64 get_pawn_attacks(int square, PieceColor color) { return pawn_attacks[color][square]; }
+Bitboard get_pawn_attacks(int square, PieceColor color) { return pawn_attacks[color][square]; }
 
-const Magic<512> &get_bishop_magic() { return bishop_magic; }
+const MagicTable<512> &get_bishop_magic() { return bishop_magic; }
 
-const Magic<4096> &get_rook_magic() { return rook_magic; }
+const MagicTable<4096> &get_rook_magic() { return rook_magic; }

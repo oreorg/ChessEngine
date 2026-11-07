@@ -13,7 +13,9 @@ file(GLOB_RECURSE SOURCES
 
 add_executable(ChessEngine ${SOURCES}
     include/chess/engine/magic.h
-    include/chess/core/helper.h)
+    include/chess/core/helper.h
+    include/chess/core/transposition_table.h
+    src/core/transposition_table.cpp)
 
 target_include_directories(ChessEngine PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include

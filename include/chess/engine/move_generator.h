@@ -4,10 +4,10 @@
 #include <chess/engine/move.h>
 #include <vector>
 
-std::vector<Move> generatePsuedoLegalMoves(const Position &position);
-std::vector<Move> generateLegalMoves(const Position &position);
+std::vector<Move> generate_pseudo_legal_moves(const Position &position);
+std::vector<Move> generate_legal_moves(const Position &position);
 
-void generatePawnMoves(const Position &position, std::vector<Move> &moveList);
-void generateKnightMoves(const Position &position, std::vector<Move> &moveList);
-void generateKingMoves(const Position &position, std::vector<Move> &moveList);
-void generateSlidingMoves(const Position &position, std::vector<Move> &moveList, PieceType type);
+void generate_pawn_moves(const Position &position, std::vector<Move> &move_list);
+void generate_knight_moves(const Position &position, std::vector<Move> &move_list);
+void generate_king_moves(const Position &position, std::vector<Move> &move_list);
+void generate_sliding_moves(const Position &position, std::vector<Move> &move_list, PieceType type);

@@ -6,92 +6,92 @@ using namespace std;
 using namespace sf;
 
 BoardGraphics::BoardGraphics() {
-  if (!loadSkins(currentBoardSkin, currentPieceSkin)) {
+  if (!load_skins(current_board_skin, current_piece_skin)) {
     std::cerr << "[BoardGraphics Error] Failed to initialize textures!" << std::endl;
   }
 }
 
-bool BoardGraphics::loadSkins(const string boardSkin, const string PieceSkin) {
-  currentBoardSkin = boardSkin;
-  currentPieceSkin = PieceSkin;
+bool BoardGraphics::load_skins(const string& board_skin, const string& piece_skin) {
+  current_board_skin = board_skin;
+  current_piece_skin = piece_skin;
 
-  const bool boardSuccess = boardTexture.loadFromFile("assets/boards/" + currentBoardSkin + ".png");
-  bool allPiecesLoaded = true;
+  const bool board_success = board_texture.loadFromFile("assets/boards/" + current_board_skin + ".png");
+  bool all_pieces_loaded = true;
   for (int i = 0; i < 12; ++i) {
-    const string_view pieceName = GetPieceNameByIndex(i);
-    const string fullPath = format("assets/pieces/{}/{}.png", currentPieceSkin, pieceName);
+    const string_view piece_name = get_piece_name_by_index(i);
+    const string full_path = format("assets/pieces/{}/{}.png", current_piece_skin, piece_name);
 
-    const bool pieceLoaded = pieceTexture[i].loadFromFile(fullPath);
+    const bool piece_loaded = piece_textures[i].loadFromFile(full_path);
 
-    if (!pieceLoaded) {
-      cerr << "Failed to load piece texture: " << fullPath << endl;
+    if (!piece_loaded) {
+      cerr << "Failed to load piece texture: " << full_path << endl;
     }
-    allPiecesLoaded = pieceLoaded && allPiecesLoaded;
+    all_pieces_loaded = piece_loaded && all_pieces_loaded;
   }
 
-  if (!boardSuccess) {
+  if (!board_success) {
     cerr << "Failed to load board texture" << endl;
   }
-  return boardSuccess && allPiecesLoaded;
+  return board_success && all_pieces_loaded;
 }
 
-void BoardGraphics::drawBoard(RenderWindow &window, Texture &boardTexture) {
-  Sprite squareSprite(boardTexture);
+void BoardGraphics::draw_board(RenderWindow& window, Texture& board_texture) {
+  Sprite square_sprite(board_texture);
   for (int square = SQ_A1; square <= SQ_H8; square++) {
     int col = get_file(square);
     int rank = get_rank(square);
-    int texTileSize = boardTexture.getSize().x / 8;
+    int texture_tile_size = board_texture.getSize().x / 8;
 
-    squareSprite.setTextureRect(IntRect({col * texTileSize, (rank)*texTileSize}, {texTileSize, texTileSize}));
+    square_sprite.setTextureRect(IntRect({col * texture_tile_size, (rank)*texture_tile_size}, {texture_tile_size, texture_tile_size}));
 
-    squareSprite.setPosition({static_cast<float>(TILE_SIZE * col), static_cast<float>(TILE_SIZE * rank)});
-    window.draw(squareSprite);
+    square_sprite.setPosition({static_cast<float>(tile_size * col), static_cast<float>(tile_size * rank)});
+    window.draw(square_sprite);
   }
 }
 
-Sprite BoardGraphics::createPieceSprite(Texture &pieceTexture, int square) {
+Sprite BoardGraphics::create_piece_sprite(Texture& piece_texture, int square) {
   int rank = get_rank(square);
   int col = get_file(square);
 
-  Sprite pieceSprite(pieceTexture);
+  Sprite piece_sprite(piece_texture);
 
-  float scaleX = (TILE_SIZE / pieceTexture.getSize().x) * PIECE_SCALE;
-  float scaleY = (TILE_SIZE / pieceTexture.getSize().y) * PIECE_SCALE;
+  float scale_x = (tile_size / piece_texture.getSize().x) * piece_scale;
+  float scale_y = (tile_size / piece_texture.getSize().y) * piece_scale;
 
-  pieceSprite.setScale({scaleX, scaleY});
+  piece_sprite.setScale({scale_x, scale_y});
 
-  float offsetX = (TILE_SIZE - (pieceTexture.getSize().x * scaleX)) / 2.0f;
-  float offsetY = (TILE_SIZE - (pieceTexture.getSize().y * scaleY)) / 2.0f;
+  float offset_x = (tile_size - (piece_texture.getSize().x * scale_x)) / 2.0f;
+  float offset_y = (tile_size - (piece_texture.getSize().y * scale_y)) / 2.0f;
 
-  pieceSprite.setPosition(
-      {static_cast<float>(TILE_SIZE * col) + offsetX, static_cast<float>(TILE_SIZE * (7 - rank)) + offsetY});
-  return pieceSprite;
+  piece_sprite.setPosition(
+      {static_cast<float>(tile_size * col) + offset_x, static_cast<float>(tile_size * (7 - rank)) + offset_y});
+  return piece_sprite;
 }
 
-void BoardGraphics::drawSquare(RenderWindow &window, int targetSquare) {
-  RectangleShape square(Vector2f(TILE_SIZE, TILE_SIZE));
-  const int file = targetSquare % 8;
-  const int rank = targetSquare / 8;
-  square.setPosition({TILE_SIZE * file, TILE_SIZE * (7 - rank)});
+void BoardGraphics::draw_square(RenderWindow &window, int target_square) {
+  RectangleShape square(Vector2f(tile_size, tile_size));
+  const int file = target_square % 8;
+  const int rank = target_square / 8;
+  square.setPosition({tile_size * file, tile_size * (7 - rank)});
   square.setFillColor(sf::Color{65, 105, 225, 200});
-  square.setSize({TILE_SIZE, TILE_SIZE});
+  square.setSize({tile_size, tile_size});
   window.draw(square);
 }
 
 void BoardGraphics::run_loop(Position position) {
-  vector<Move> legalMoves;
-  RenderWindow window(VideoMode({SCREEN_SIZE, SCREEN_SIZE}), "Chess Engine");
+  vector<Move> legal_moves;
+  RenderWindow window(VideoMode({screen_size, screen_size}), "Chess Engine");
   window.setFramerateLimit(60);
 
-  optional<int> draggedSquare;
-  Vector2i dragPosition{};
+  optional<int> dragged_square;
+  Vector2i drag_position{};
 
-  auto squareAt = [this](Vector2i pixel) -> optional<int> {
-    if (pixel.x < 0 || pixel.x >= static_cast<int>(SCREEN_SIZE) || pixel.y < 0 ||
-        pixel.y >= static_cast<int>(SCREEN_SIZE))
+  auto square_at = [this](Vector2i pixel) -> optional<int> {
+    if (pixel.x < 0 || pixel.x >= static_cast<int>(screen_size) || pixel.y < 0 ||
+        pixel.y >= static_cast<int>(screen_size))
       return nullopt;
-    const int col = pixel.x / static_cast<int>(TILE_SIZE);
-    const int rank = 7 - (pixel.y / static_cast<int>(TILE_SIZE));
+    const int col = pixel.x / static_cast<int>(tile_size);
+    const int rank = 7 - (pixel.y / static_cast<int>(tile_size));
     return get_square(col, rank);
   };
 
@@ -106,84 +106,84 @@ void BoardGraphics::run_loop(Position position) {
         if (!(press && press->button == Mouse::Button::Left)) continue;
         if (!(Mouse::isButtonPressed(Mouse::Button::Left))) continue;
 
-        legalMoves = position.getLegalMoves();
-        const auto square = squareAt(press->position);
+        legal_moves = position.get_legal_moves();
+        const auto square = square_at(press->position);
 
         if (!(square)) continue;
         if (!(position.board[*square] != NO_PIECE_TYPE)) continue;
-        dragPosition = press->position;
-        draggedSquare = square;
+        drag_position = press->position;
+        dragged_square = square;
       }
 
-      if (const auto *keyPress = event->getIf<Event::KeyPressed>()) {
-        if (keyPress->code == sf::Keyboard::Key::R) {
+      if (const auto *key_press = event->getIf<Event::KeyPressed>()) {
+        if (key_press->code == sf::Keyboard::Key::R) {
           cout << position.undo_move() << endl;
         }
       }
 
-      if (const auto *moved = event->getIf<Event::MouseMoved>()) dragPosition = moved->position;
+      if (const auto *moved = event->getIf<Event::MouseMoved>()) drag_position = moved->position;
 
       if (const auto *release = event->getIf<Event::MouseButtonReleased>()) {
-        if (!(release && release->button == Mouse::Button::Left && draggedSquare)) continue;
-        if (const auto target = squareAt(release->position); target && *target != *draggedSquare) {
-          std::vector<Move> matchingMoves;
+        if (!(release && release->button == Mouse::Button::Left && dragged_square)) continue;
+        if (const auto target = square_at(release->position); target && *target != *dragged_square) {
+          std::vector<Move> matching_moves;
 
-          std::ranges::copy_if(legalMoves, std::back_inserter(matchingMoves), [&](const Move &move) {
-            return move.square() == *draggedSquare && move.target_square() == *target;
+          std::ranges::copy_if(legal_moves, std::back_inserter(matching_moves), [&](const Move &move) {
+            return move.square() == *dragged_square && move.target_square() == *target;
           });
-          int chosenPiece = 0;
+          int chosen_piece = 0;
           char selection;
-          if (!(matchingMoves.empty())) {
-            if (matchingMoves[0].type() == PROMOTION) {
+          if (!(matching_moves.empty())) {
+            if (matching_moves[0].type() == PROMOTION) {
               cout << "choose n : KNIGHT | b : BISHOP | r : ROOK | q : QUEEN" << endl;
               cin >> selection;
               switch (selection) {
               case 'n':
-                chosenPiece = 0;
+                chosen_piece = 0;
                 break;
               case 'b':
-                chosenPiece = 1;
+                chosen_piece = 1;
                 break;
               case 'r':
-                chosenPiece = 2;
+                chosen_piece = 2;
                 break;
               case 'q':
-                chosenPiece = 3;
+                chosen_piece = 3;
                 break;
               default:
-                chosenPiece = 3;
+                chosen_piece = 3;
                 break;
               }
             }
-            position.make_move(matchingMoves[chosenPiece]);
+            position.make_move(matching_moves[chosen_piece]);
           }
         }
-        draggedSquare.reset();
+        dragged_square.reset();
       }
     }
     window.clear();
-    drawBoard(window, boardTexture);
-    if (draggedSquare) {
-      for (const auto move : legalMoves) {
-        if (!(draggedSquare == move.square())) continue;
-        drawSquare(window, move.target_square());
+    draw_board(window, board_texture);
+    if (dragged_square) {
+      for (const auto move : legal_moves) {
+        if (!(dragged_square == move.square())) continue;
+        draw_square(window, move.target_square());
       }
     }
     for (int square = SQ_A1; square <= SQ_H8; square++) {
-      if (draggedSquare == square) continue;
+      if (dragged_square == square) continue;
       int index = position.board[square];
       if (index == NO_PIECE_TYPE) continue;
-      Sprite pieceSprite = createPieceSprite(pieceTexture[index], square);
-      window.draw(pieceSprite);
+      Sprite piece_sprite = create_piece_sprite(piece_textures[index], square);
+      window.draw(piece_sprite);
     }
 
-    if (draggedSquare) {
-      const int index = position.board[*draggedSquare];
-      Vector2f newPosition = {dragPosition.x - Offset, dragPosition.y - Offset};
-      Sprite pieceSprite = createPieceSprite(pieceTexture[index], *draggedSquare);
-      pieceSprite.setPosition(newPosition);
-      pieceSprite.setScale({0.7f, 0.7f});
-      window.draw(pieceSprite);
+    if (dragged_square) {
+      const int index = position.board[*dragged_square];
+      Vector2f new_position = {drag_position.x - offset, drag_position.y - offset};
+      Sprite piece_sprite = create_piece_sprite(piece_textures[index], *dragged_square);
+      piece_sprite.setPosition(new_position);
+      piece_sprite.setScale({0.7f, 0.7f});
+      window.draw(piece_sprite);
     }
 
     window.display();
