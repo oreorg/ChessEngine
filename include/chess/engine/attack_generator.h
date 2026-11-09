@@ -30,4 +30,4 @@ Bitboard get_pawn_attacks(int square, PieceColor color);
 
 Bitboard shift_bitboard(Bitboard bitboard, int direction);
 
-bool is_king_attacked(Position position, PieceColor king_color);
+bool is_square_attacked(Position &position, int square, PieceColor opponent);

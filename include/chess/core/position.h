@@ -21,8 +21,7 @@ inline constexpr int DISTANCE_TO_QUEEN_ROOK = 4;
 struct Position {
   uint8_t castling_rights = WHITE_KING_SIDE | WHITE_QUEEN_SIDE | BLACK_KING_SIDE | BLACK_QUEEN_SIDE;
   int half_moves = 0;
-  int en_passant_square;
-  std::vector<Move> legal_moves = {};
+  int en_passant_square = -1;
   PositionStatus status = ONGOING;
 
   int board[64] = {0};
@@ -34,15 +33,16 @@ struct Position {
   PieceColor side_to_move = WHITE;
   bool make_move(Move move);
   bool undo_move();
-  void generate_legal_moves();
   void init_start_position();
-  int perft(int depth);
 
 private:
+  friend MoveList generate_legal_moves(Position &position);
+  friend Position parse_fen(std::string_view fen);
+
   void clear();
   void place_piece(PieceType piece_type, PieceColor color, int square);
   void remove_piece(int square);
-  bool make_move_internal(Move move);
+  bool apply_move(Move move);
   bool undo_move_internal();
   void update_hash(bool is_white);
   bool validate_move(Move &move, PieceColor piece_color, int index);

@@ -40,7 +40,6 @@ void Position::init_start_position() {
 
   update_hash(true);
   hash_history.push_back(hash_key);
-  generate_legal_moves();
 }
 
 void Position::clear() {
@@ -142,13 +141,16 @@ void Position::make_special_move(Move &move, int index, UndoInfo &info) {
   }
 
   if (piece_type == ROOK) {
-    if (is_white) {
-      if (move.extra() == KING_SIDE) castling_rights &= ~WHITE_KING_SIDE;
-      if (move.extra() == QUEEN_SIDE) castling_rights &= ~WHITE_QUEEN_SIDE;
-    } else {
-      if (move.extra() == KING_SIDE) castling_rights &= ~BLACK_KING_SIDE;
-      if (move.extra() == QUEEN_SIDE) castling_rights &= ~BLACK_QUEEN_SIDE;
-    }
+    if (start_square == SQ_H1) castling_rights &= ~WHITE_KING_SIDE;
+    if (start_square == SQ_A1) castling_rights &= ~WHITE_QUEEN_SIDE;
+    if (start_square == SQ_H8) castling_rights &= ~BLACK_KING_SIDE;
+    if (start_square == SQ_A8) castling_rights &= ~BLACK_QUEEN_SIDE;
+  }
+  if (board[target_square] % 6 == ROOK) {
+    if (target_square == SQ_H1) castling_rights &= ~WHITE_KING_SIDE;
+    if (target_square == SQ_A1) castling_rights &= ~WHITE_QUEEN_SIDE;
+    if (target_square == SQ_H8) castling_rights &= ~BLACK_KING_SIDE;
+    if (target_square == SQ_A8) castling_rights &= ~BLACK_QUEEN_SIDE;
   }
 }
 
@@ -156,40 +158,34 @@ bool Position::validate_move(Move &move, PieceColor piece_color, int index) {
   if (move.square() < SQ_A1 || move.square() > SQ_H8 || move.target_square() < SQ_A1 || move.target_square() > SQ_H8)
     return false;
   if (move.square() == move.target_square()) return false;
-  std::vector<Move> legal_moves = generate_pseudo_legal_moves(*this);
+  MoveList legal_moves;
+  generate_pseudo_legal_moves(*this, legal_moves);
   if (index == NO_PIECE_TYPE) return false;
   if (side_to_move != piece_color) return false;
-  const bool contains_move = std::ranges::any_of(legal_moves, [=](const Move &move) {
-    return move.square() == move.square() && move.target_square() == move.target_square();
+  const bool contains_move = std::ranges::any_of(legal_moves, [=](const Move &m) {
+    return m.square() == move.square() && m.target_square() == move.target_square();
   });
   if (!contains_move) return false;
   return true;
 }
 
 bool Position::make_move(Move move) {
-  if (!make_move_internal(move)) return false;
-  generate_legal_moves();
+  if (!apply_move(move)) return false;
   status = check_position();
-
-  if (status == CHECKMATE) {
-    std::string text = side_to_move == WHITE ? "Black " : "White ";
-    std::cout << text << " has won" << std::endl;
-  } else if (status == STALEMATE) {
-    std::cout << "Stalemate" << std::endl;
-  }
   return true;
 }
 
 bool Position::undo_move() {
   if (!undo_move_internal()) return false;
-  generate_legal_moves();
-  status = check_position();
+  status = ONGOING;
   return true;
 }
 
 PositionStatus Position::check_position() {
-  if (legal_moves.empty()) {
-    if (is_king_attacked(*this, side_to_move)) {
+  if (generate_legal_moves(*this).empty()) {
+    Bitboard king = side_to_move == WHITE ? piece_boards[KING] : piece_boards[KING + 6];
+    int square = pop_lsb(king);
+    if (is_square_attacked(*this, square, side_to_move)) {
       return CHECKMATE;
     } else {
       return STALEMATE;
@@ -207,7 +203,7 @@ PositionStatus Position::check_position() {
   return ONGOING;
 }
 
-bool Position::make_move_internal(Move move) {
+bool Position::apply_move(Move move) {
   const int start_square = move.square();
   const int target_square = move.target_square();
   const int index = board[move.square()];
@@ -227,6 +223,7 @@ bool Position::make_move_internal(Move move) {
   if (move.type() == PROMOTION) {
     piece_type = static_cast<PieceType>(move.extra());
   }
+
   make_special_move(move, index, info);
 
   remove_piece(target_square);
@@ -240,8 +237,6 @@ bool Position::make_move_internal(Move move) {
   info.move_type = static_cast<MoveType>(move.type());
   info.half_moves = half_moves;
   history.push_back(info);
-
-  status = check_position();
 
   return true;
 }
@@ -287,20 +282,4 @@ bool Position::undo_move_internal() {
   hash_key = hash_history.back();
   side_to_move = side_to_move == WHITE ? BLACK : WHITE;
   return true;
-}
-
-void Position::generate_legal_moves() {
-  legal_moves = {};
-  if (status != ONGOING) return;
-
-  Position position = *this;
-  std::vector<Move> psudo_move_list = generate_pseudo_legal_moves(*this);
-  PieceColor king_color = position.side_to_move;
-
-  for (const auto move : psudo_move_list) {
-    position.make_move_internal(move);
-    if (!is_king_attacked(position, king_color)) legal_moves.push_back(move);
-
-    position.undo_move_internal();
-  }
 }

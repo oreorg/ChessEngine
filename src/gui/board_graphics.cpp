@@ -1,6 +1,7 @@
 #include <SFML/Graphics.hpp>
 #include <algorithm>
 #include <chess/core/zobrist_hash.h>
+#include <chess/engine/move_generator.h>
 #include <chess/gui/board_graphics.h>
 
 using namespace std;
@@ -126,14 +127,14 @@ void BoardGraphics::run_loop(Position position) {
       if (const auto *release = event->getIf<Event::MouseButtonReleased>()) {
         if (!(release && release->button == Mouse::Button::Left && dragged_square)) continue;
         if (const auto target = square_at(release->position); target && *target != *dragged_square) {
-          std::vector<Move> matching_moves;
+          vector<Move> matching_moves;
 
-          std::ranges::copy_if(position.legal_moves, std::back_inserter(matching_moves), [&](const Move &move) {
-            return move.square() == *dragged_square && move.target_square() == *target;
-          });
+          std::ranges::copy_if(
+              generate_legal_moves(position), std::back_inserter(matching_moves),
+              [&](const Move &move) { return move.square() == *dragged_square && move.target_square() == *target; });
           int chosen_piece = 0;
           char selection;
-          if (!(matching_moves.empty())) {
+          if (!matching_moves.empty()) {
             if (matching_moves[0].type() == PROMOTION) {
               cout << "choose n : KNIGHT | b : BISHOP | r : ROOK | q : QUEEN" << endl;
               cin >> selection;
@@ -168,7 +169,7 @@ void BoardGraphics::run_loop(Position position) {
     window.clear();
     draw_board(window, board_texture);
     if (dragged_square) {
-      for (const auto move : position.legal_moves) {
+      for (const auto move : generate_legal_moves(position)) {
         if (!(dragged_square == move.square())) continue;
         draw_square(window, move.target_square());
       }

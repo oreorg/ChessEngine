@@ -241,28 +241,21 @@ void precompute_rook_mask() {
   }
 }
 
-bool is_king_attacked(Position position, PieceColor king_color) {
-  Bitboard king_bitboard = position.piece_boards[KING + king_color * 6];
-  Bitboard occupancies = position.occupancies[BOTH];
-  int square = pop_lsb(king_bitboard);
-  int rook_index = ((rook_magic.mask[square] & occupancies) * rook_magic.number[square]) >>
+bool is_square_attacked(Position &position, int square, PieceColor opponent) {
+  int rook_index = ((rook_magic.mask[square] & position.occupancies[BOTH]) * rook_magic.number[square]) >>
                    (64 - count_bits(rook_magic.mask[square]));
-  int bishop_index = ((bishop_magic.mask[square] & occupancies) * bishop_magic.number[square]) >>
+  int bishop_index = ((bishop_magic.mask[square] & position.occupancies[BOTH]) * bishop_magic.number[square]) >>
                      (64 - count_bits(bishop_magic.mask[square]));
 
-  PieceColor opponent = king_color == WHITE ? BLACK : WHITE;
-  Bitboard rook = rook_magic.attacks[square][rook_index];
-  Bitboard bishop = bishop_magic.attacks[square][bishop_index];
-  Bitboard knight = knight_attacks[square];
-  Bitboard pawn = pawn_attacks[opponent][square];
-  Bitboard king = king_attacks[square];
-
-  if (bishop & (position.piece_boards[BISHOP + opponent * 6] | position.piece_boards[QUEEN + opponent * 6]))
+  if (bishop_magic.attacks[square][bishop_index] &
+      (position.piece_boards[BISHOP + opponent * 6] | position.piece_boards[QUEEN + opponent * 6]))
     return true;
-  if (rook & (position.piece_boards[ROOK + opponent * 6] | position.piece_boards[QUEEN + opponent * 6])) return true;
-  if (knight & position.piece_boards[KNIGHT + opponent * 6]) return true;
-  if (pawn & position.piece_boards[PAWN + opponent * 6]) return true;
-  if (king & position.piece_boards[KING + opponent * 6]) return true;
+  if (rook_magic.attacks[square][rook_index] &
+      (position.piece_boards[ROOK + opponent * 6] | position.piece_boards[QUEEN + opponent * 6]))
+    return true;
+  if (knight_attacks[square] & position.piece_boards[KNIGHT + opponent * 6]) return true;
+  if (pawn_attacks[opponent == WHITE ? BLACK : WHITE][square] & position.piece_boards[PAWN + opponent * 6]) return true;
+  if (king_attacks[square] & position.piece_boards[KING + opponent * 6]) return true;
 
   return false;
 }

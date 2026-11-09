@@ -11,8 +11,10 @@ AlignTrailingComments: true # Keeps any comments in sync.
 IndentWidth: 2
 TabWidth: 2
 UseTab: Never # Use spaces for indentation
-ColumnLimit: 120 # Standard limit, adjust as needed
+ColumnLimit: 140 # Standard limit, adjust as needed
 
 # Control how spaces are added, matching modern C++ preferences:
 SpaceAfterCStyleCast: false
 AllowShortIfStatementsOnASingleLine: Always
+NamespaceIndentation: All
+AllowShortCaseLabelsOnASingleLine: true

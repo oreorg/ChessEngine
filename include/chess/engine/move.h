@@ -24,6 +24,20 @@ public:
   constexpr MoveType type() const { return static_cast<MoveType>((data >> 12) & 0x3); }
 
   constexpr int extra() const { return (data >> 14) & 0x3; }
+  std::string to_string() const { return convert_index_to_notation(square()) + convert_index_to_notation(target_square()); }
+};
+
+struct MoveList {
+  Move move_list[256];
+  int count = 0;
+
+  Move *begin() { return move_list; }
+  Move *end() { return move_list + count; }
+
+  void push_back(Move move) { move_list[count++] = move; }
+  bool empty() { return count == 0; }
+
+  size_t size() { return count; }
 };
 
 struct UndoInfo {
