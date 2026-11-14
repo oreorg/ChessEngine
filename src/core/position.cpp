@@ -2,45 +2,8 @@
 #include <chess/core/helper.h>
 #include <chess/core/position.h>
 #include <chess/core/zobrist_hash.h>
-#include <chess/engine/attack_generator.h>
-#include <chess/engine/move_generator.h>
-
-void Position::init_start_position() {
-  clear();
-  for (int i = SQ_A2; i <= SQ_H2; i++) {
-    place_piece(PAWN, WHITE, i);
-  }
-  place_piece(ROOK, WHITE, SQ_A1);
-  place_piece(ROOK, WHITE, SQ_H1);
-
-  place_piece(KNIGHT, WHITE, SQ_B1);
-  place_piece(KNIGHT, WHITE, SQ_G1);
-
-  place_piece(BISHOP, WHITE, SQ_C1);
-  place_piece(BISHOP, WHITE, SQ_F1);
-
-  place_piece(QUEEN, WHITE, SQ_D1);
-  place_piece(KING, WHITE, SQ_E1);
-
-  for (int i = SQ_A7; i <= SQ_H7; i++) {
-    place_piece(PAWN, BLACK, i);
-  }
-
-  place_piece(ROOK, BLACK, SQ_A8);
-  place_piece(ROOK, BLACK, SQ_H8);
-
-  place_piece(KNIGHT, BLACK, SQ_B8);
-  place_piece(KNIGHT, BLACK, SQ_G8);
-
-  place_piece(BISHOP, BLACK, SQ_C8);
-  place_piece(BISHOP, BLACK, SQ_F8);
-
-  place_piece(QUEEN, BLACK, SQ_D8);
-  place_piece(KING, BLACK, SQ_E8);
-
-  update_hash(true);
-  hash_history.push_back(hash_key);
-}
+#include <chess/core/attack_generator.h>
+#include <chess/core/move_generator.h>
 
 void Position::clear() {
   for (int i = SQ_A1; i <= SQ_H8; i++) {
@@ -155,22 +118,20 @@ void Position::make_special_move(Move &move, int index, UndoInfo &info) {
 }
 
 bool Position::validate_move(Move &move, PieceColor piece_color, int index) {
-  if (move.square() < SQ_A1 || move.square() > SQ_H8 || move.target_square() < SQ_A1 || move.target_square() > SQ_H8)
-    return false;
+  if (move.square() < SQ_A1 || move.square() > SQ_H8 || move.target_square() < SQ_A1 || move.target_square() > SQ_H8) return false;
   if (move.square() == move.target_square()) return false;
   MoveList legal_moves;
   generate_pseudo_legal_moves(*this, legal_moves);
   if (index == NO_PIECE_TYPE) return false;
   if (side_to_move != piece_color) return false;
-  const bool contains_move = std::ranges::any_of(legal_moves, [=](const Move &m) {
-    return m.square() == move.square() && m.target_square() == move.target_square();
-  });
+  const bool contains_move = std::ranges::any_of(
+      legal_moves, [=](const Move &m) { return m.square() == move.square() && m.target_square() == move.target_square(); });
   if (!contains_move) return false;
   return true;
 }
 
 bool Position::make_move(Move move) {
-  if (!apply_move(move)) return false;
+  if (!make_move_internal(move)) return false;
   status = check_position();
   return true;
 }
@@ -183,9 +144,10 @@ bool Position::undo_move() {
 
 PositionStatus Position::check_position() {
   if (generate_legal_moves(*this).empty()) {
-    Bitboard king = side_to_move == WHITE ? piece_boards[KING] : piece_boards[KING + 6];
+    U64 king = side_to_move == WHITE ? piece_boards[KING] : piece_boards[KING + 6];
     int square = pop_lsb(king);
-    if (is_square_attacked(*this, square, side_to_move)) {
+    const PieceColor opponent = side_to_move == WHITE ? BLACK : WHITE;
+    if (is_square_attacked(*this, square, opponent)) {
       return CHECKMATE;
     } else {
       return STALEMATE;
@@ -203,7 +165,7 @@ PositionStatus Position::check_position() {
   return ONGOING;
 }
 
-bool Position::apply_move(Move move) {
+bool Position::make_move_internal(Move move) {
   const int start_square = move.square();
   const int target_square = move.target_square();
   const int index = board[move.square()];
@@ -217,8 +179,7 @@ bool Position::apply_move(Move move) {
   }
 
   PieceType piece_type = static_cast<PieceType>(index % 6);
-  UndoInfo info{start_square, target_square, static_cast<PieceType>(board[target_square]), castling_rights,
-                en_passant_square};
+  UndoInfo info{start_square, target_square, static_cast<PieceType>(board[target_square]), castling_rights, en_passant_square};
 
   if (move.type() == PROMOTION) {
     piece_type = static_cast<PieceType>(move.extra());

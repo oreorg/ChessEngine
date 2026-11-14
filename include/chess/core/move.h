@@ -1,7 +1,9 @@
 #pragma once
 
+#include <chess/core/helper.h>
 #include <chess/core/types.h>
 #include <cstdint>
+#include <string>
 
 enum MoveType { NORMAL, PROMOTION, CASTLE, EN_PASSANT };
 
@@ -28,9 +30,11 @@ public:
 };
 
 struct MoveList {
+private:
   Move move_list[256];
   int count = 0;
 
+public:
   Move *begin() { return move_list; }
   Move *end() { return move_list + count; }
 

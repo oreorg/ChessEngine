@@ -1,21 +1,21 @@
 #include <bit>
 #include <chess/core/helper.h>
-#include <chess/engine/attack_generator.h>
+#include <chess/core/attack_generator.h>
 #include <iterator>
 #include <random>
 
-constexpr Bitboard BORDER_MASK = 0xFF818181818181FFULL;
+constexpr U64 BORDER_MASK = 0xFF818181818181FFULL;
 
-constexpr Bitboard FILE_A = 0x0101010101010101ULL;
-constexpr Bitboard FILE_B = 0x0202020202020202ULL;
-constexpr Bitboard FILE_G = 0x4040404040404040ULL;
-constexpr Bitboard FILE_H = 0x8080808080808080ULL;
+constexpr U64 FILE_A = 0x0101010101010101ULL;
+constexpr U64 FILE_B = 0x0202020202020202ULL;
+constexpr U64 FILE_G = 0x4040404040404040ULL;
+constexpr U64 FILE_H = 0x8080808080808080ULL;
 
 std::mt19937_64 rng{666}; // Fixed seed makes magic search reproducible.
 
-Bitboard knight_attacks[64];
-Bitboard king_attacks[64];
-Bitboard pawn_attacks[2][64];
+U64 knight_attacks[64];
+U64 king_attacks[64];
+U64 pawn_attacks[2][64];
 
 MagicTable<512> bishop_magic;
 MagicTable<4096> rook_magic;
@@ -34,8 +34,8 @@ void precompute_all_attacks() {
 
 void precompute_knight_attacks() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
-    Bitboard bitboard = 1ULL << square;
-    Bitboard attacks = 0ULL;
+    U64 bitboard = 1ULL << square;
+    U64 attacks = 0ULL;
 
     // KNIGHT WHEN ON LEFT SIDE
     if ((bitboard << 17) & ~FILE_A) attacks |= bitboard << 17;
@@ -55,9 +55,9 @@ void precompute_knight_attacks() {
 
 void precompute_pawn_attacks() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
-    Bitboard bitboard = 1ULL << square;
-    Bitboard white_attacks = 0ULL;
-    Bitboard black_attacks = 0ULL;
+    U64 bitboard = 1ULL << square;
+    U64 white_attacks = 0ULL;
+    U64 black_attacks = 0ULL;
     if (bitboard << 7 & ~FILE_H) white_attacks |= bitboard << 7;
     if (bitboard << 9 & ~FILE_A) white_attacks |= bitboard << 9;
 
@@ -70,8 +70,8 @@ void precompute_pawn_attacks() {
 
 void precompute_king_attacks() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
-    Bitboard bitboard = 1ULL << square;
-    Bitboard attacks = 0ULL;
+    U64 bitboard = 1ULL << square;
+    U64 attacks = 0ULL;
 
     if ((bitboard << 1) & ~FILE_A) attacks |= bitboard << 1;
     if ((bitboard << 7) & ~FILE_H) attacks |= bitboard << 7;
@@ -87,17 +87,17 @@ void precompute_king_attacks() {
   }
 }
 
-void generate_all_blockers(Bitboard mask, std::vector<Bitboard> &blockers) {
-  Bitboard current = 0ULL;
+void generate_all_blockers(U64 mask, std::vector<U64> &blockers) {
+  U64 current = 0ULL;
   do {
     blockers.push_back(current);
     current = (current - mask) & mask;
   } while (current);
 }
 
-Bitboard generate_magic_number() { return rng() & rng() & rng(); }
+U64 generate_magic_number() { return rng() & rng() & rng(); }
 
-Bitboard shift_bitboard(Bitboard bitboard, int direction) {
+U64 shift_bitboard(U64 bitboard, int direction) {
   switch (direction) {
   case 1:
     return (bitboard & ~FILE_H) << 1;
@@ -120,12 +120,12 @@ Bitboard shift_bitboard(Bitboard bitboard, int direction) {
   }
 }
 
-Bitboard slow_attacks(int square, Bitboard occupied, PieceType type) {
+U64 slow_attacks(int square, U64 occupied, PieceType type) {
   const std::array<int, 4> directions =
       type == BISHOP ? std::array<int, 4>{9, 7, -7, -9} : std::array<int, 4>{1, 8, -1, -8};
-  Bitboard attacks = 0ULL;
+  U64 attacks = 0ULL;
   for (const int direction : directions) {
-    Bitboard bitboard = 1ULL << square;
+    U64 bitboard = 1ULL << square;
     while ((bitboard = shift_bitboard(bitboard, direction)) != 0) {
       attacks |= bitboard;
       if (bitboard & occupied) break;
@@ -136,18 +136,18 @@ Bitboard slow_attacks(int square, Bitboard occupied, PieceType type) {
 
 void find_bishop_magics() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
-    const Bitboard mask = bishop_magic.mask[square];
+    const U64 mask = bishop_magic.mask[square];
     const int bits = count_bits(mask);
 
-    std::vector<Bitboard> blockers;
+    std::vector<U64> blockers;
     generate_all_blockers(mask, blockers);
 
-    std::vector<Bitboard> attacks(blockers.size());
+    std::vector<U64> attacks(blockers.size());
     for (std::size_t i = 0; i < blockers.size(); ++i) {
       attacks[i] = slow_attacks(square, blockers[i], BISHOP);
     }
     while (true) {
-      const Bitboard magic = generate_magic_number();
+      const U64 magic = generate_magic_number();
       std::fill(std::begin(bishop_magic.attacks[square]), std::end(bishop_magic.attacks[square]), 0ULL);
 
       bool fail = false;
@@ -173,18 +173,18 @@ void find_bishop_magics() {
 
 void find_rook_magics() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
-    const Bitboard mask = rook_magic.mask[square];
+    const U64 mask = rook_magic.mask[square];
     const int bits = count_bits(mask);
 
-    std::vector<Bitboard> blockers;
+    std::vector<U64> blockers;
     generate_all_blockers(mask, blockers);
 
-    std::vector<Bitboard> attacks(blockers.size());
+    std::vector<U64> attacks(blockers.size());
     for (std::size_t i = 0; i < blockers.size(); i++) {
       attacks[i] = slow_attacks(square, blockers[i], ROOK);
     }
     while (true) {
-      const Bitboard magic = generate_magic_number();
+      const U64 magic = generate_magic_number();
       std::fill(std::begin(rook_magic.attacks[square]), std::end(rook_magic.attacks[square]), 0ULL);
 
       bool fail = false;
@@ -208,18 +208,18 @@ void find_rook_magics() {
   }
 }
 
-Bitboard relevant_sliding_mask(int square, PieceType type) {
+U64 relevant_sliding_mask(int square, PieceType type) {
   const std::array<int, 4> directions =
       type == BISHOP ? std::array<int, 4>{9, 7, -7, -9} : std::array<int, 4>{1, 8, -1, -8};
 
-  Bitboard mask = 0ULL;
+  U64 mask = 0ULL;
   for (const int direction : directions) {
-    Bitboard bitboard = 1ULL << square;
+    U64 bitboard = 1ULL << square;
     while (true) {
       bitboard = shift_bitboard(bitboard, direction);
       if (bitboard == 0ULL) break;
 
-      const Bitboard next = shift_bitboard(bitboard, direction);
+      const U64 next = shift_bitboard(bitboard, direction);
       if (next == 0ULL) break;
 
       mask |= bitboard;
@@ -260,10 +260,10 @@ bool is_square_attacked(Position &position, int square, PieceColor opponent) {
   return false;
 }
 
-Bitboard get_knight_attacks(int square) { return knight_attacks[square]; }
-Bitboard get_king_attacks(int square) { return king_attacks[square]; }
+U64 get_knight_attacks(int square) { return knight_attacks[square]; }
+U64 get_king_attacks(int square) { return king_attacks[square]; }
 
-Bitboard get_pawn_attacks(int square, PieceColor color) { return pawn_attacks[color][square]; }
+U64 get_pawn_attacks(int square, PieceColor color) { return pawn_attacks[color][square]; }
 
 const MagicTable<512> &get_bishop_magic() { return bishop_magic; }
 

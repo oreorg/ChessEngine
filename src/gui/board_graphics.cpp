@@ -1,8 +1,6 @@
 #include <SFML/Graphics.hpp>
-#include <algorithm>
-#include <chess/core/zobrist_hash.h>
-#include <chess/engine/move_generator.h>
 #include <chess/gui/board_graphics.h>
+#include <future>
 
 using namespace std;
 using namespace sf;
@@ -44,8 +42,7 @@ void BoardGraphics::draw_board(RenderWindow &window, Texture &board_texture) {
     int rank = get_rank(square);
     int texture_tile_size = board_texture.getSize().x / 8;
 
-    square_sprite.setTextureRect(
-        IntRect({col * texture_tile_size, (rank)*texture_tile_size}, {texture_tile_size, texture_tile_size}));
+    square_sprite.setTextureRect(IntRect({col * texture_tile_size, (rank)*texture_tile_size}, {texture_tile_size, texture_tile_size}));
 
     square_sprite.setPosition({static_cast<float>(tile_size * col), static_cast<float>(tile_size * rank)});
     window.draw(square_sprite);
@@ -53,7 +50,7 @@ void BoardGraphics::draw_board(RenderWindow &window, Texture &board_texture) {
 }
 
 Sprite BoardGraphics::create_piece_sprite(Texture &piece_texture, int square) {
-  int rank = get_rank(square);
+  int rank = inverse ? 7 - get_rank(square) : get_rank(square);
   int col = get_file(square);
 
   Sprite piece_sprite(piece_texture);
@@ -66,34 +63,35 @@ Sprite BoardGraphics::create_piece_sprite(Texture &piece_texture, int square) {
   float offset_x = (tile_size - (piece_texture.getSize().x * scale_x)) / 2.0f;
   float offset_y = (tile_size - (piece_texture.getSize().y * scale_y)) / 2.0f;
 
-  piece_sprite.setPosition(
-      {static_cast<float>(tile_size * col) + offset_x, static_cast<float>(tile_size * (7 - rank)) + offset_y});
+  piece_sprite.setPosition({static_cast<float>(tile_size * col) + offset_x, static_cast<float>(tile_size * (7 - rank)) + offset_y});
   return piece_sprite;
 }
 
 void BoardGraphics::draw_square(RenderWindow &window, int target_square) {
   RectangleShape square(Vector2f(tile_size, tile_size));
   const int file = target_square % 8;
-  const int rank = target_square / 8;
+  const int rank = inverse ? 7 - (target_square / 8) : (target_square / 8);
   square.setPosition({tile_size * file, tile_size * (7 - rank)});
   square.setFillColor(sf::Color{65, 105, 225, 200});
   square.setSize({tile_size, tile_size});
   window.draw(square);
 }
 
-void BoardGraphics::run_loop(Position position) {
+void BoardGraphics::run_loop(Game &game, Engine &engine) {
+  std::future<std::optional<Move>> engine_future;
+  bool engine_searching = false;
+  sf::Clock ai_wait_clock;
+
   RenderWindow window(VideoMode({screen_size, screen_size}), "Chess Engine");
   window.setFramerateLimit(60);
 
   optional<int> dragged_square;
   Vector2i drag_position{};
 
-  auto square_at = [this](Vector2i pixel) -> optional<int> {
-    if (pixel.x < 0 || pixel.x >= static_cast<int>(screen_size) || pixel.y < 0 ||
-        pixel.y >= static_cast<int>(screen_size))
-      return nullopt;
+  auto square_at = [this, &game](Vector2i pixel) -> optional<int> {
+    if (pixel.x < 0 || pixel.x >= static_cast<int>(screen_size) || pixel.y < 0 || pixel.y >= static_cast<int>(screen_size)) return nullopt;
     const int col = pixel.x / static_cast<int>(tile_size);
-    const int rank = 7 - (pixel.y / static_cast<int>(tile_size));
+    const int rank = game.player_color == WHITE ? 7 - (pixel.y / static_cast<int>(tile_size)) : (pixel.y / static_cast<int>(tile_size));
     return get_square(col, rank);
   };
 
@@ -111,14 +109,18 @@ void BoardGraphics::run_loop(Position position) {
         const auto square = square_at(press->position);
 
         if (!(square)) continue;
-        if (!(position.board[*square] != NO_PIECE_TYPE)) continue;
-        drag_position = press->position;
-        dragged_square = square;
+        if (!(game.position.board[*square] != NO_PIECE_TYPE)) continue;
+        PieceColor piece_color = game.position.board[*square] >= 6 ? BLACK : WHITE;
+        if (piece_color == game.player_color) {
+          drag_position = press->position;
+          dragged_square = square;
+        }
       }
 
       if (const auto *key_press = event->getIf<Event::KeyPressed>()) {
         if (key_press->code == sf::Keyboard::Key::R) {
-          position.undo_move();
+          game.position.undo_move();
+          ai_wait_clock.restart();
         }
       }
 
@@ -129,9 +131,8 @@ void BoardGraphics::run_loop(Position position) {
         if (const auto target = square_at(release->position); target && *target != *dragged_square) {
           vector<Move> matching_moves;
 
-          std::ranges::copy_if(
-              generate_legal_moves(position), std::back_inserter(matching_moves),
-              [&](const Move &move) { return move.square() == *dragged_square && move.target_square() == *target; });
+          std::ranges::copy_if(generate_legal_moves(game.position), std::back_inserter(matching_moves),
+                               [&](const Move &move) { return move.square() == *dragged_square && move.target_square() == *target; });
           int chosen_piece = 0;
           char selection;
           if (!matching_moves.empty()) {
@@ -139,28 +140,19 @@ void BoardGraphics::run_loop(Position position) {
               cout << "choose n : KNIGHT | b : BISHOP | r : ROOK | q : QUEEN" << endl;
               cin >> selection;
               switch (selection) {
-              case 'n':
-                chosen_piece = 0;
-                break;
-              case 'b':
-                chosen_piece = 1;
-                break;
-              case 'r':
-                chosen_piece = 2;
-                break;
-              case 'q':
-                chosen_piece = 3;
-                break;
-              default:
-                chosen_piece = 3;
-                break;
+              case 'n': chosen_piece = 1; break;
+              case 'b': chosen_piece = 2; break;
+              case 'r': chosen_piece = 3; break;
+              case 'q': chosen_piece = 4; break;
+              default: chosen_piece = 4; break;
               }
             }
-            position.make_move(matching_moves[chosen_piece]);
-            cout << "hash: " << hex << position.hash_key
-                 << ", castling_rights: " << static_cast<unsigned int>(position.castling_rights)
-                 << ", side_to_move: " << position.side_to_move << dec
-                 << ", enpassant_square: " << position.en_passant_square << endl;
+            game.position.make_move(matching_moves[chosen_piece]);
+            cout << "hash: " << hex << game.position.hash_key
+                 << ", castling_rights: " << static_cast<unsigned int>(game.position.castling_rights)
+                 << ", side_to_move: " << game.position.side_to_move << dec << ", enpassant_square: " << game.position.en_passant_square
+                 << endl;
+            ai_wait_clock.restart();
           }
         }
         dragged_square.reset();
@@ -169,28 +161,40 @@ void BoardGraphics::run_loop(Position position) {
     window.clear();
     draw_board(window, board_texture);
     if (dragged_square) {
-      for (const auto move : generate_legal_moves(position)) {
+      for (const auto move : generate_legal_moves(game.position)) {
         if (!(dragged_square == move.square())) continue;
         draw_square(window, move.target_square());
       }
     }
     for (int square = SQ_A1; square <= SQ_H8; square++) {
       if (dragged_square == square) continue;
-      int index = position.board[square];
+      int index = game.position.board[square];
       if (index == NO_PIECE_TYPE) continue;
       Sprite piece_sprite = create_piece_sprite(piece_textures[index], square);
       window.draw(piece_sprite);
     }
 
     if (dragged_square) {
-      const int index = position.board[*dragged_square];
+      const int index = game.position.board[*dragged_square];
       Vector2f new_position = {drag_position.x - offset, drag_position.y - offset};
       Sprite piece_sprite = create_piece_sprite(piece_textures[index], *dragged_square);
       piece_sprite.setPosition(new_position);
       piece_sprite.setScale({0.7f, 0.7f});
       window.draw(piece_sprite);
     }
-
     window.display();
+
+    // After drawing each frame:
+    if (!engine_searching && engine.ai_color == game.position.side_to_move) {
+      Position snapshot = game.position;
+      engine_future =
+          std::async(std::launch::async, [&engine, snapshot = std::move(snapshot)]() mutable { return engine.find_best_move(snapshot); });
+      engine_searching = true;
+    }
+
+    if (engine_searching && engine_future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+      if (auto move = engine_future.get()) game.position.make_move(*move);
+      engine_searching = false;
+    }
   }
 }

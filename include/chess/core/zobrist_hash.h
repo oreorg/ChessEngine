@@ -1,15 +1,14 @@
 #pragma once
+#include <chess/core/helper.h>
 #include <cstdint>
 #include <random>
 
-using Bitboard = std::uint64_t;
-
 class ZobristHash {
 public:
-  Bitboard piece_keys[12][64];
-  std::uint64_t side_key;
-  std::uint64_t castling_keys[16];
-  std::uint64_t ep_keys[8];
+  U64 piece_keys[12][64];
+  U64 side_key;
+  U64 castling_keys[16];
+  U64 ep_keys[8];
 
   ZobristHash() {
     std::mt19937_64 random_bitboard(1337);

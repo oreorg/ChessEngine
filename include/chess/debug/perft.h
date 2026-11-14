@@ -6,6 +6,6 @@
 
 namespace Debugging {
   // Standalone perft function operating on a Position reference
-  Bitboard count_nodes(Position &pos, int depth);
-  void perft(Position &pos, int depth, bool divide);
+  U64 count_nodes(Position &pos, int depth);
+  void perft(Position &pos, int depth);
 } // namespace Debugging

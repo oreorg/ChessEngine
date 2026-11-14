@@ -5,7 +5,7 @@
 
 enum PieceColor : int { WHITE, BLACK, BOTH };
 
-enum PieceType : int { KNIGHT, BISHOP, ROOK, QUEEN, PAWN, KING, NO_PIECE_TYPE = -1 };
+enum PieceType : int { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, NO_PIECE_TYPE = -1 };
 
 // clang-format off
 enum Square : int {
@@ -21,7 +21,7 @@ enum Square : int {
 // clang-format on
 
 constexpr std::array<std::string_view, 12> PIECE_TYPE_NAMES = {
-    "wn", "Wb", "wr", "wq", "wp", "wk", "bn", "bb", "br", "bq", "bp", "bk",
+    "wp", "wn", "Wb", "wr", "wq", "wk", "bp", "bn", "bb", "br", "bq", "bk",
 };
 
 inline std::string_view get_piece_name_by_index(int index) {
