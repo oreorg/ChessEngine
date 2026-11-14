@@ -1,15 +1,19 @@
-#include <chess/core/position.h>
 #include <chess/core/move_generator.h>
+#include <chess/core/position.h>
 #include <chrono>
 #include <thread>
 
 namespace Debugging {
   U64 count_nodes(Position &pos, int depth) {
     if (depth == 0) return 1ULL;
-
+    MoveList move_list;
+    generate_pseudo_legal_moves(pos, move_list);
     U64 nodes = 0;
-    for (const auto move : generate_legal_moves(pos)) {
-      if (!pos.make_move(move)) continue;
+    for (const auto move : move_list) {
+      if (!pos.make_move(move)) {
+        pos.undo_move();
+        continue;
+      }
       nodes += count_nodes(pos, depth - 1);
       pos.undo_move();
     }
@@ -21,17 +25,22 @@ namespace Debugging {
 
     U64 total_nodes = 0;
 
-    MoveList legal_moves = generate_legal_moves(pos);
-    std::vector<Move> moves(legal_moves.begin(), legal_moves.end());
-    std::vector<U64> results(legal_moves.size());
+    MoveList psuedo_legal;
+    generate_pseudo_legal_moves(pos, psuedo_legal);
+    std::vector<Move> moves(psuedo_legal.begin(), psuedo_legal.end());
+    std::vector<U64> results(psuedo_legal.size());
     std::vector<std::thread> workers;
     auto start = std::chrono::high_resolution_clock::now();
 
     for (size_t i = 0; i < moves.size(); i++) {
       workers.emplace_back([&, i] {
         Position worker_position = pos;
-        if (worker_position.make_move(moves[i])) {
+        if (!worker_position.make_move(moves[i])) {
+          worker_position.undo_move();
+          results[i] = 0;
+        } else {
           results[i] = count_nodes(worker_position, depth - 1);
+          worker_position.undo_move();
         }
       });
     }

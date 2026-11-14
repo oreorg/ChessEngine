@@ -1,9 +1,9 @@
 #include <algorithm>
+#include <chess/core/attack_generator.h>
 #include <chess/core/helper.h>
+#include <chess/core/move_generator.h>
 #include <chess/core/position.h>
 #include <chess/core/zobrist_hash.h>
-#include <chess/core/attack_generator.h>
-#include <chess/core/move_generator.h>
 
 void Position::clear() {
   for (int i = SQ_A1; i <= SQ_H8; i++) {
@@ -117,31 +117,6 @@ void Position::make_special_move(Move &move, int index, UndoInfo &info) {
   }
 }
 
-bool Position::validate_move(Move &move, PieceColor piece_color, int index) {
-  if (move.square() < SQ_A1 || move.square() > SQ_H8 || move.target_square() < SQ_A1 || move.target_square() > SQ_H8) return false;
-  if (move.square() == move.target_square()) return false;
-  MoveList legal_moves;
-  generate_pseudo_legal_moves(*this, legal_moves);
-  if (index == NO_PIECE_TYPE) return false;
-  if (side_to_move != piece_color) return false;
-  const bool contains_move = std::ranges::any_of(
-      legal_moves, [=](const Move &m) { return m.square() == move.square() && m.target_square() == move.target_square(); });
-  if (!contains_move) return false;
-  return true;
-}
-
-bool Position::make_move(Move move) {
-  if (!make_move_internal(move)) return false;
-  status = check_position();
-  return true;
-}
-
-bool Position::undo_move() {
-  if (!undo_move_internal()) return false;
-  status = ONGOING;
-  return true;
-}
-
 PositionStatus Position::check_position() {
   if (generate_legal_moves(*this).empty()) {
     U64 king = side_to_move == WHITE ? piece_boards[KING] : piece_boards[KING + 6];
@@ -165,12 +140,11 @@ PositionStatus Position::check_position() {
   return ONGOING;
 }
 
-bool Position::make_move_internal(Move move) {
+bool Position::make_move(Move move) {
   const int start_square = move.square();
   const int target_square = move.target_square();
   const int index = board[move.square()];
   PieceColor piece_color = static_cast<PieceColor>(index >= 6 ? BLACK : WHITE);
-  if (!validate_move(move, piece_color, index)) return false;
   bool is_white = piece_color == WHITE;
 
   half_moves += 1;
@@ -182,7 +156,7 @@ bool Position::make_move_internal(Move move) {
   UndoInfo info{start_square, target_square, static_cast<PieceType>(board[target_square]), castling_rights, en_passant_square};
 
   if (move.type() == PROMOTION) {
-    piece_type = static_cast<PieceType>(move.extra());
+    piece_type = static_cast<PieceType>(move.extra() + 1);
   }
 
   make_special_move(move, index, info);
@@ -199,10 +173,12 @@ bool Position::make_move_internal(Move move) {
   info.half_moves = half_moves;
   history.push_back(info);
 
+  U64 king_bitboard = piece_boards[KING + piece_color * 6];
+  if (is_square_attacked(*this, pop_lsb(king_bitboard), side_to_move)) return false;
   return true;
 }
 
-bool Position::undo_move_internal() {
+bool Position::undo_move() {
   if (history.empty()) return false;
   hash_history.pop_back();
   UndoInfo info = history.back();

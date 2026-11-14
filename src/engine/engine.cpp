@@ -8,37 +8,50 @@
 #include <vector>
 
 int MATE_SCORE = 50000;
-int MAX_DEPTH = 1;
+int MAX_DEPTH = 6;
 
 int negamax(Position &position, int depth, int alpha, int beta) {
   if (depth == 0) {
     const int score = evaluate(position);
     return position.side_to_move == WHITE ? score : -score;
   }
+  int score;
+  MoveList psuedo_legal;
+  bool has_legal_moves = false;
+  generate_pseudo_legal_moves(position, psuedo_legal);
 
-  int best_score = -MATE_SCORE;
-  MoveList legal_moves = generate_legal_moves(position);
-
-  for (const auto move : legal_moves) {
-    position.make_move(move);
-    int score = -negamax(position, depth - 1, alpha, beta);
+  for (const auto move : psuedo_legal) {
+    if (!position.make_move(move)) {
+      position.undo_move();
+      continue;
+    }
+    has_legal_moves = true;
+    score = -negamax(position, depth - 1, -beta, -alpha);
     position.undo_move();
 
-    if (score > best_score) best_score = score;
-  }
+    if (score >= beta) {
+      return beta;
+    }
+    if (score > alpha) {
+      alpha = score;
+    }
+  };
 
-  if (position.check_position() == CHECKMATE) {
-    return -MATE_SCORE;
-  }
-  if (position.check_position() == STALEMATE) {
+  if (!has_legal_moves) {
+    U64 king = position.piece_boards[KING + position.side_to_move * 6];
+    PieceColor opponent = position.side_to_move == WHITE ? BLACK : WHITE;
+    if (is_square_attacked(position, pop_lsb(king), opponent)) {
+      return -MATE_SCORE + (MAX_DEPTH - depth);
+    }
     return 0;
   }
-  return best_score;
+
+  return alpha;
 }
 
 std::optional<Move> Engine::find_best_move(Position &position) {
-  MoveList legal_moves = generate_legal_moves(position);
-  if (legal_moves.empty()) return std::nullopt;
+  MoveList legal_moves;
+  generate_pseudo_legal_moves(position, legal_moves);
 
   int alpha = -MATE_SCORE;
   int beta = MATE_SCORE;
@@ -46,15 +59,18 @@ std::optional<Move> Engine::find_best_move(Position &position) {
   std::vector<std::thread> workers = {};
   std::vector<Move> moves(legal_moves.begin(), legal_moves.end());
   Move best_move = Move(0, 0);
-  std::vector<int> scores(moves.size());
+  std::vector<int> scores(moves.size(), std::numeric_limits<int>::lowest());
 
   for (size_t i = 0; i < moves.size(); i++) {
     workers.emplace_back([&, i]() {
       Position worker_position = position;
-      worker_position.make_move(moves[i]);
-      int score = -negamax(worker_position, MAX_DEPTH, alpha, beta);
-      worker_position.undo_move();
-      scores[i] = score;
+      if (!worker_position.make_move(moves[i])) {
+        worker_position.undo_move();
+      } else {
+        int score = -negamax(worker_position, MAX_DEPTH, -beta, -alpha);
+        worker_position.undo_move();
+        scores[i] = score;
+      }
     });
   }
 
@@ -70,7 +86,9 @@ std::optional<Move> Engine::find_best_move(Position &position) {
     }
   }
 
-  std::cout << best_score << std::endl;
+  if (best_score == std::numeric_limits<int>::lowest()) return std::nullopt;
+
+  std::cout << "best score: " << best_score << ", best move: " << best_move.to_string() << std::endl;
 
   return best_move;
 }

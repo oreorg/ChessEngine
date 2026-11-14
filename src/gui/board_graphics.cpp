@@ -118,7 +118,7 @@ void BoardGraphics::run_loop(Game &game, Engine &engine) {
       }
 
       if (const auto *key_press = event->getIf<Event::KeyPressed>()) {
-        if (key_press->code == sf::Keyboard::Key::R) {
+        if (key_press->code == sf::Keyboard::Key::R && !engine_searching) {
           game.position.undo_move();
           ai_wait_clock.restart();
         }
@@ -140,13 +140,14 @@ void BoardGraphics::run_loop(Game &game, Engine &engine) {
               cout << "choose n : KNIGHT | b : BISHOP | r : ROOK | q : QUEEN" << endl;
               cin >> selection;
               switch (selection) {
-              case 'n': chosen_piece = 1; break;
-              case 'b': chosen_piece = 2; break;
-              case 'r': chosen_piece = 3; break;
-              case 'q': chosen_piece = 4; break;
-              default: chosen_piece = 4; break;
+              case 'n': chosen_piece = 0; break;
+              case 'b': chosen_piece = 1; break;
+              case 'r': chosen_piece = 2; break;
+              case 'q': chosen_piece = 3; break;
+              default: chosen_piece = 3; break;
               }
             }
+
             game.position.make_move(matching_moves[chosen_piece]);
             cout << "hash: " << hex << game.position.hash_key
                  << ", castling_rights: " << static_cast<unsigned int>(game.position.castling_rights)
@@ -193,7 +194,11 @@ void BoardGraphics::run_loop(Game &game, Engine &engine) {
     }
 
     if (engine_searching && engine_future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
-      if (auto move = engine_future.get()) game.position.make_move(*move);
+      if (auto move = engine_future.get()) {
+        if (!game.position.make_move(*move)) {
+          std::cerr << "Engine move was rejected: " << move->to_string() << std::endl;
+        }
+      }
       engine_searching = false;
     }
   }

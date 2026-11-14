@@ -2,9 +2,9 @@
 
 #include <chess/core/helper.h>
 
-template <std::size_t TableSize>
-struct MagicTable{
-    U64 number[64];
-    U64 mask[64];
-    U64 attacks[64][TableSize];
+template <std::size_t TableSize> struct MagicTable {
+  int shift[64];
+  U64 number[64];
+  U64 mask[64];
+  U64 attacks[64][TableSize];
 };

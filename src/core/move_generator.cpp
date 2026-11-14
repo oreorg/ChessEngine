@@ -1,6 +1,5 @@
 #include <bit>
 #include <chess/core/helper.h>
-#include <chess/core/attack_generator.h>
 #include <chess/core/move_generator.h>
 #include <iterator>
 #include <vector>
@@ -25,17 +24,15 @@ MoveList generate_legal_moves(Position &position) {
   MoveList psuedo_moves;
   generate_pseudo_legal_moves(position, psuedo_moves);
 
-  const PieceColor king_color = position.side_to_move;
-  const PieceColor opponent = king_color == WHITE ? BLACK : WHITE;
-
   for (const Move move : psuedo_moves) {
-    if (!position.make_move_internal(move)) continue;
+    if (!position.make_move(move)) {
+      position.undo_move();
+      continue;
+    }
 
-    U64 king = king_color == WHITE ? position.piece_boards[KING] : position.piece_boards[KING + 6];
-    const int square = pop_lsb(king);
-    if (!is_square_attacked(position, square, opponent)) legal_moves.push_back(move);
+    legal_moves.push_back(move);
 
-    position.undo_move_internal();
+    position.undo_move();
   }
   return legal_moves;
 }
@@ -46,7 +43,7 @@ void generate_pawn_moves(Position &position, MoveList &move_list) {
   const int direction = !index ? 8 : -8;
   const U64 pawns = position.piece_boards[PAWN + index];
   const PieceColor opponent_color = is_white ? BLACK : WHITE;
-  const U64 opponent = position.occupancies[opponent_color];
+  const U64 opponent = position.occupancies[opponent_color] & ~position.piece_boards[KING + opponent_color * 6];
   const U64 occupied = position.occupancies[BOTH];
 
   auto add_moves = [&move_list, direction](U64 targets, int offset, MoveType type = NORMAL) {
@@ -54,10 +51,10 @@ void generate_pawn_moves(Position &position, MoveList &move_list) {
       int promotion_rank = direction == 8 ? 7 : 0;
       const int target = pop_lsb(targets);
       if (target / 8 == promotion_rank) {
-        move_list.push_back({target - offset, target, PROMOTION, KNIGHT});
-        move_list.push_back({target - offset, target, PROMOTION, BISHOP});
-        move_list.push_back({target - offset, target, PROMOTION, ROOK});
-        move_list.push_back({target - offset, target, PROMOTION, QUEEN});
+        move_list.push_back({target - offset, target, PROMOTION, KNIGHT - 1});
+        move_list.push_back({target - offset, target, PROMOTION, BISHOP - 1});
+        move_list.push_back({target - offset, target, PROMOTION, ROOK - 1});
+        move_list.push_back({target - offset, target, PROMOTION, QUEEN - 1});
       } else {
         move_list.push_back({target - offset, target, type});
       }
@@ -95,6 +92,8 @@ void generate_pawn_moves(Position &position, MoveList &move_list) {
 void generate_knight_moves(Position &position, MoveList &move_list) {
   const int index = position.side_to_move * 6;
   const U64 player_pieces = position.occupancies[position.side_to_move];
+  const PieceColor opponent = position.side_to_move == WHITE ? BLACK : WHITE;
+  const U64 opponent_king = position.piece_boards[KING + opponent * 6];
 
   U64 knights = position.piece_boards[KNIGHT + index];
   U64 attacks;
@@ -102,7 +101,7 @@ void generate_knight_moves(Position &position, MoveList &move_list) {
   while (knights) {
     const int square = pop_lsb(knights);
     attacks = get_knight_attacks(square);
-    attacks &= ~player_pieces;
+    attacks &= ~player_pieces & ~opponent_king;
     while (attacks) {
       const int target = pop_lsb(attacks);
       move_list.push_back({square, target});
@@ -114,12 +113,13 @@ void generate_king_moves(Position &position, MoveList &move_list) {
   const int index = position.side_to_move * 6;
   const U64 player_pieces = position.occupancies[position.side_to_move];
   const PieceColor opponent = position.side_to_move == WHITE ? BLACK : WHITE;
+  const U64 opponent_king = position.piece_boards[KING + opponent * 6];
 
   U64 king = position.piece_boards[KING + index];
   int square = pop_lsb(king);
 
   U64 attacks = get_king_attacks(square);
-  attacks &= ~player_pieces;
+  attacks &= ~player_pieces & ~opponent_king;
   while (attacks) {
     const int target = pop_lsb(attacks);
     move_list.push_back({square, target});
@@ -153,15 +153,15 @@ void generate_king_moves(Position &position, MoveList &move_list) {
 template <std::size_t TableSize>
 void generate_sliding_moves_impl(Position &position, MoveList &move_list, U64 pieces, const MagicTable<TableSize> &magic) {
   const U64 player_pieces = position.occupancies[position.side_to_move];
+  const PieceColor opponent = position.side_to_move == WHITE ? BLACK : WHITE;
+  const U64 opponent_king = position.piece_boards[KING + opponent * 6];
   U64 attacks;
   while (pieces) {
     const int square = pop_lsb(pieces);
-    U64 mask = magic.mask[square];
-    U64 number = magic.number[square];
-    int bits = count_bits(mask);
-    std::size_t index = ((mask & position.occupancies[BOTH]) * number) >> (64 - bits);
+
+    std::size_t index = ((magic.mask[square] & position.occupancies[BOTH]) * magic.number[square]) >> magic.shift[square];
     attacks = magic.attacks[square][index];
-    attacks &= ~player_pieces;
+    attacks &= ~player_pieces & ~opponent_king;
     while (attacks) {
       const int target = pop_lsb(attacks);
       move_list.push_back({square, target});

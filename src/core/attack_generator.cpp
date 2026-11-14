@@ -1,6 +1,6 @@
 #include <bit>
-#include <chess/core/helper.h>
 #include <chess/core/attack_generator.h>
+#include <chess/core/helper.h>
 #include <iterator>
 #include <random>
 
@@ -99,30 +99,20 @@ U64 generate_magic_number() { return rng() & rng() & rng(); }
 
 U64 shift_bitboard(U64 bitboard, int direction) {
   switch (direction) {
-  case 1:
-    return (bitboard & ~FILE_H) << 1;
-  case -1:
-    return (bitboard & ~FILE_A) >> 1;
-  case 8:
-    return bitboard << 8;
-  case -8:
-    return bitboard >> 8;
-  case 9:
-    return (bitboard & ~FILE_H) << 9;
-  case 7:
-    return (bitboard & ~FILE_A) << 7;
-  case -7:
-    return (bitboard & ~FILE_H) >> 7;
-  case -9:
-    return (bitboard & ~FILE_A) >> 9;
-  default:
-    return 0;
+  case 1: return (bitboard & ~FILE_H) << 1;
+  case -1: return (bitboard & ~FILE_A) >> 1;
+  case 8: return bitboard << 8;
+  case -8: return bitboard >> 8;
+  case 9: return (bitboard & ~FILE_H) << 9;
+  case 7: return (bitboard & ~FILE_A) << 7;
+  case -7: return (bitboard & ~FILE_H) >> 7;
+  case -9: return (bitboard & ~FILE_A) >> 9;
+  default: return 0;
   }
 }
 
 U64 slow_attacks(int square, U64 occupied, PieceType type) {
-  const std::array<int, 4> directions =
-      type == BISHOP ? std::array<int, 4>{9, 7, -7, -9} : std::array<int, 4>{1, 8, -1, -8};
+  const std::array<int, 4> directions = type == BISHOP ? std::array<int, 4>{9, 7, -7, -9} : std::array<int, 4>{1, 8, -1, -8};
   U64 attacks = 0ULL;
   for (const int direction : directions) {
     U64 bitboard = 1ULL << square;
@@ -138,6 +128,7 @@ void find_bishop_magics() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
     const U64 mask = bishop_magic.mask[square];
     const int bits = count_bits(mask);
+    bishop_magic.shift[square] = 64 - bits;
 
     std::vector<U64> blockers;
     generate_all_blockers(mask, blockers);
@@ -153,7 +144,7 @@ void find_bishop_magics() {
       bool fail = false;
 
       for (std::size_t i = 0; i < blockers.size(); ++i) {
-        const std::size_t index = (blockers[i] * magic >> (64 - bits));
+        const std::size_t index = (blockers[i] * magic >> bishop_magic.shift[square]);
 
         if (bishop_magic.attacks[square][index] && bishop_magic.attacks[square][index] != attacks[i]) {
           fail = true;
@@ -175,6 +166,7 @@ void find_rook_magics() {
   for (int square = SQ_A1; square <= SQ_H8; square++) {
     const U64 mask = rook_magic.mask[square];
     const int bits = count_bits(mask);
+    rook_magic.shift[square] = 64 - bits;
 
     std::vector<U64> blockers;
     generate_all_blockers(mask, blockers);
@@ -190,7 +182,7 @@ void find_rook_magics() {
       bool fail = false;
 
       for (std::size_t i = 0; i < blockers.size(); i++) {
-        const std::size_t index = (blockers[i] * magic >> (64 - bits));
+        const std::size_t index = (blockers[i] * magic >> rook_magic.shift[square]);
 
         if (rook_magic.attacks[square][index] && rook_magic.attacks[square][index] != attacks[i]) {
           fail = true;
@@ -209,8 +201,7 @@ void find_rook_magics() {
 }
 
 U64 relevant_sliding_mask(int square, PieceType type) {
-  const std::array<int, 4> directions =
-      type == BISHOP ? std::array<int, 4>{9, 7, -7, -9} : std::array<int, 4>{1, 8, -1, -8};
+  const std::array<int, 4> directions = type == BISHOP ? std::array<int, 4>{9, 7, -7, -9} : std::array<int, 4>{1, 8, -1, -8};
 
   U64 mask = 0ULL;
   for (const int direction : directions) {
@@ -242,16 +233,15 @@ void precompute_rook_mask() {
 }
 
 bool is_square_attacked(Position &position, int square, PieceColor opponent) {
-  int rook_index = ((rook_magic.mask[square] & position.occupancies[BOTH]) * rook_magic.number[square]) >>
-                   (64 - count_bits(rook_magic.mask[square]));
+  int rook_index =
+      ((rook_magic.mask[square] & position.occupancies[BOTH]) * rook_magic.number[square]) >> (64 - count_bits(rook_magic.mask[square]));
   int bishop_index = ((bishop_magic.mask[square] & position.occupancies[BOTH]) * bishop_magic.number[square]) >>
                      (64 - count_bits(bishop_magic.mask[square]));
 
   if (bishop_magic.attacks[square][bishop_index] &
       (position.piece_boards[BISHOP + opponent * 6] | position.piece_boards[QUEEN + opponent * 6]))
     return true;
-  if (rook_magic.attacks[square][rook_index] &
-      (position.piece_boards[ROOK + opponent * 6] | position.piece_boards[QUEEN + opponent * 6]))
+  if (rook_magic.attacks[square][rook_index] & (position.piece_boards[ROOK + opponent * 6] | position.piece_boards[QUEEN + opponent * 6]))
     return true;
   if (knight_attacks[square] & position.piece_boards[KNIGHT + opponent * 6]) return true;
   if (pawn_attacks[opponent == WHITE ? BLACK : WHITE][square] & position.piece_boards[PAWN + opponent * 6]) return true;
